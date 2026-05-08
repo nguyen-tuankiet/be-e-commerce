@@ -8,8 +8,7 @@ Backend RESTful API cho nền tảng dịch vụ sửa chữa & chăm sóc nhà 
 
 | Thành phần | Công nghệ đề xuất |
 |---|---|
-| Runtime | Node.js >= 20 |
-| Framework | Express.js / NestJS |
+| Runtime | Springboot >= 20 |
 | Database | PostgreSQL |
 | ORM | Prisma / TypeORM |
 | Cache | Redis |
