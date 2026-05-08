@@ -1,0 +1,203 @@
+{
+  "info": {
+    "_postman_id": "be-ecommerce-api-v1",
+    "name": "BE E-Commerce API",
+    "description": "Spring Boot REST API — Auth + User Management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL",      "value": "http://localhost:8080", "type": "string" },
+    { "key": "ACCESS_TOKEN",  "value": "",                      "type": "string" },
+    { "key": "REFRESH_TOKEN", "value": "",                      "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('ACCESS_TOKEN',  res.data.accessToken);",
+                  "  pm.collectionVariables.set('REFRESH_TOKEN', res.data.refreshToken);",
+                  "  pm.test('Register successful', () => pm.expect(res.success).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"email\": \"vana@email.com\",\n  \"phone\": \"0901234567\",\n  \"password\": \"Abc@1234\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/auth/register", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('ACCESS_TOKEN',  res.data.accessToken);",
+                  "  pm.collectionVariables.set('REFRESH_TOKEN', res.data.refreshToken);",
+                  "  pm.test('Login successful', () => pm.expect(res.success).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"vana@email.com\",\n  \"password\": \"Abc@1234\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/auth/login", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('ACCESS_TOKEN', res.data.accessToken);",
+                  "  pm.test('Token refreshed', () => pm.expect(res.success).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/auth/refresh-token", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "refresh-token"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/auth/logout", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "logout"] }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"vana@email.com\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/auth/forgot-password", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "forgot-password"] }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"NewAbc@1234\",\n  \"confirmPassword\": \"NewAbc@1234\",\n  \"token\": \"<reset-token-from-log>\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/auth/change-password", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "change-password"] }
+          }
+        },
+        {
+          "name": "Get Current User (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/auth/me", "host": ["{{BASE_URL}}"], "path": ["api", "auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Users (Paginated + Filter)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/users?page=1&limit=10&role=customer&status=active&keyword=Nguyễn",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "page",     "value": "1" },
+                { "key": "limit",    "value": "10" },
+                { "key": "role",     "value": "customer",  "disabled": true },
+                { "key": "status",   "value": "active",    "disabled": true },
+                { "key": "district", "value": "Quận 1",    "disabled": true },
+                { "key": "keyword",  "value": "Nguyễn",    "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/users/1", "host": ["{{BASE_URL}}"], "path": ["api", "users", "1"] }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Trần Thị Lan\",\n  \"phone\": \"0912345678\",\n  \"address\": \"123 Nguyễn Văn Linh, Quận 7\",\n  \"district\": \"Quận 7\",\n  \"bio\": \"Kỹ thuật viên điện lạnh có 5 năm kinh nghiệm\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/users/1", "host": ["{{BASE_URL}}"], "path": ["api", "users", "1"] }
+          }
+        },
+        {
+          "name": "Update User Status (Admin Only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"locked\",\n  \"reason\": \"Vi phạm điều khoản sử dụng\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/users/2/status", "host": ["{{BASE_URL}}"], "path": ["api", "users", "2", "status"] }
+          }
+        }
+      ]
+    }
+  ]
+}
