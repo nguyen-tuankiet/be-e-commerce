@@ -12,6 +12,7 @@ public final class ApiConstant {
     public static final String USER_BASE     = BASE_API + "/users";
     public static final String WALLET_BASE   = BASE_API + "/wallet";
     public static final String NOTIFICATION_BASE = BASE_API + "/notifications";
+    public static final String ORDER_BASE     = BASE_API + "/orders";
 
     // Auth endpoints
     public static final String AUTH_REGISTER         = "/register";

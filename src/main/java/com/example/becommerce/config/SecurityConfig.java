@@ -83,6 +83,9 @@ public class SecurityConfig {
                 // Notification module — authenticated user only
                 .requestMatchers(ApiConstant.NOTIFICATION_BASE + "/**").authenticated()
 
+                // Order module — authenticated user only
+                .requestMatchers(ApiConstant.ORDER_BASE + "/**").authenticated()
+
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
