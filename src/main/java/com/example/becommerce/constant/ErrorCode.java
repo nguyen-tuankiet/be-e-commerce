@@ -47,4 +47,8 @@ public final class ErrorCode {
     public static final String BANK_ACCOUNT_DELETE_NOT_ALLOWED  = "BANK_ACCOUNT_DELETE_NOT_ALLOWED";
     public static final String BANK_ACCOUNT_OWNER_MISMATCH      = "BANK_ACCOUNT_OWNER_MISMATCH";
     public static final String PAYMENT_GATEWAY_ERROR            = "PAYMENT_GATEWAY_ERROR";
+
+    // Notification
+    public static final String NOTIFICATION_NOT_FOUND           = "NOTIFICATION_NOT_FOUND";
+    public static final String NOTIFICATION_CREATE_FAILED       = "NOTIFICATION_CREATE_FAILED";
 }

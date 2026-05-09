@@ -80,6 +80,9 @@ public class SecurityConfig {
                 // Wallet module — authenticated user only
                 .requestMatchers(ApiConstant.WALLET_BASE + "/**").authenticated()
 
+                // Notification module — authenticated user only
+                .requestMatchers(ApiConstant.NOTIFICATION_BASE + "/**").authenticated()
+
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
