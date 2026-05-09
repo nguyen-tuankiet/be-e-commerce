@@ -198,6 +198,131 @@
           }
         }
       ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "Get Wallet Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/wallet", "host": ["{{BASE_URL}}"], "path": ["api", "wallet"] }
+          }
+        },
+        {
+          "name": "Get Wallet Transactions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/wallet/transactions?type=all&page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "wallet", "transactions"],
+              "query": [
+                { "key": "type",  "value": "all" },
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Top Up Wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500000,\n  \"method\": \"vnpay\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/wallet/topup", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "topup"] }
+          }
+        },
+        {
+          "name": "Confirm Top Up",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"TX-TOPUP-001\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/wallet/topup/confirm", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "topup", "confirm"] }
+          }
+        },
+        {
+          "name": "Withdraw",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000000,\n  \"bankAccountId\": \"BANK-001\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/wallet/withdraw", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "withdraw"] }
+          }
+        },
+        {
+          "name": "VNPay IPN Callback (Mock)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/vnpay/ipn?vnp_TxnRef=TX-TOPUP-001&vnp_Amount=50000000&vnp_ResponseCode=00&vnp_TransactionStatus=00&vnp_TransactionNo=12345&vnp_SecureHash=<signature>",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "vnpay", "ipn"],
+              "query": [
+                { "key": "vnp_TxnRef", "value": "TX-TOPUP-001" },
+                { "key": "vnp_Amount", "value": "50000000" },
+                { "key": "vnp_ResponseCode", "value": "00" },
+                { "key": "vnp_TransactionStatus", "value": "00" },
+                { "key": "vnp_TransactionNo", "value": "12345" },
+                { "key": "vnp_SecureHash", "value": "<signature>" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Bank Accounts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/wallet/bank-accounts", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "bank-accounts"] }
+          }
+        },
+        {
+          "name": "Create Bank Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankName\": \"MB Bank\",\n  \"accountNumber\": \"190332884123\",\n  \"accountOwner\": \"NGUYEN VAN A\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/wallet/bank-accounts", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "bank-accounts"] }
+          }
+        },
+        {
+          "name": "Delete Bank Account",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/wallet/bank-accounts/BANK-002", "host": ["{{BASE_URL}}"], "path": ["api", "wallet", "bank-accounts", "BANK-002"] }
+          }
+        }
+      ]
     }
   ]
 }

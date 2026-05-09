@@ -17,6 +17,7 @@ import com.example.becommerce.repository.RefreshTokenRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.security.JwtProvider;
 import com.example.becommerce.service.AuthService;
+import com.example.becommerce.service.WalletService;
 import com.example.becommerce.utils.UserCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProvider                 jwtProvider;
     private final UserMapper                  userMapper;
     private final UserCodeGenerator           codeGenerator;
+    private final WalletService               walletService;
 
     // ----------------------------------------------------------------
     // Register
@@ -87,6 +89,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         user = userRepository.save(user);
+        walletService.createWalletForUser(user);
         log.info("New user registered: {} [{}]", user.getEmail(), user.getCode());
 
         // 5. Issue tokens

@@ -68,6 +68,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers(ApiConstant.AUTH_BASE + "/**").permitAll()
+                .requestMatchers("/api/payments/**").permitAll()
 
                 // Admin-only
                 .requestMatchers(HttpMethod.PATCH, ApiConstant.USER_BASE + "/*/status")
@@ -75,6 +76,9 @@ public class SecurityConfig {
 
                 // All other /api/users/** — authenticated
                 .requestMatchers(ApiConstant.USER_BASE + "/**").authenticated()
+
+                // Wallet module — authenticated user only
+                .requestMatchers(ApiConstant.WALLET_BASE + "/**").authenticated()
 
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()

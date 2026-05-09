@@ -10,6 +10,7 @@ public final class ApiConstant {
     public static final String BASE_API      = "/api";
     public static final String AUTH_BASE     = BASE_API + "/auth";
     public static final String USER_BASE     = BASE_API + "/users";
+    public static final String WALLET_BASE   = BASE_API + "/wallet";
 
     // Auth endpoints
     public static final String AUTH_REGISTER         = "/register";
@@ -22,4 +23,11 @@ public final class ApiConstant {
 
     // User endpoints
     public static final String USER_UPDATE_STATUS    = "/{id}/status";
+
+    // Wallet endpoints
+    public static final String WALLET_TRANSACTIONS   = "/transactions";
+    public static final String WALLET_TOPUP          = "/topup";
+    public static final String WALLET_TOPUP_CONFIRM  = "/topup/confirm";
+    public static final String WALLET_WITHDRAW       = "/withdraw";
+    public static final String WALLET_BANK_ACCOUNTS  = "/bank-accounts";
 }

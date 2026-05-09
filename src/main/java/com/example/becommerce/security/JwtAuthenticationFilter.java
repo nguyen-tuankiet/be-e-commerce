@@ -48,6 +48,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+                    if (userDetails instanceof CustomUserDetails customUserDetails
+                            && (!customUserDetails.isAccountNonLocked() || !customUserDetails.isEnabled())) {
+                        log.warn("Skipping JWT authentication for locked/disabled user: {}", email);
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
