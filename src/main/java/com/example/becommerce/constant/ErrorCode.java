@@ -53,4 +53,14 @@ public final class ErrorCode {
     // Notification
     public static final String NOTIFICATION_NOT_FOUND           = "NOTIFICATION_NOT_FOUND";
     public static final String NOTIFICATION_CREATE_FAILED       = "NOTIFICATION_CREATE_FAILED";
+
+    // Order
+    public static final String ORDER_NOT_FOUND                 = "ORDER_NOT_FOUND";
+    public static final String ORDER_CREATE_FAILED             = "ORDER_CREATE_FAILED";
+    public static final String ORDER_INVALID_STATUS            = "ORDER_INVALID_STATUS";
+    public static final String ORDER_NOT_OWN_TECHNICIAN        = "ORDER_NOT_OWN_TECHNICIAN";
+    public static final String ORDER_CANNOT_CANCEL             = "ORDER_CANNOT_CANCEL";
+    public static final String ORDER_ALREADY_ASSIGNED          = "ORDER_ALREADY_ASSIGNED";
+    public static final String ORDER_NOT_OWN_CUSTOMER          = "ORDER_NOT_OWN_CUSTOMER";
+    public static final String ORDER_EXTRA_COST_EXISTS         = "ORDER_EXTRA_COST_EXISTS";
 }
