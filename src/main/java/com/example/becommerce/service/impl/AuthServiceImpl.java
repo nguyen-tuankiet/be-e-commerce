@@ -6,17 +6,20 @@ import com.example.becommerce.dto.request.*;
 import com.example.becommerce.dto.response.AuthResponse;
 import com.example.becommerce.dto.response.TokenRefreshResponse;
 import com.example.becommerce.dto.response.UserResponse;
+import com.example.becommerce.entity.EmailConfirmationToken;
 import com.example.becommerce.entity.PasswordResetToken;
 import com.example.becommerce.entity.RefreshToken;
 import com.example.becommerce.entity.User;
 import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.entity.enums.UserStatus;
 import com.example.becommerce.exception.AppException;
+import com.example.becommerce.repository.EmailConfirmationTokenRepository;
 import com.example.becommerce.repository.PasswordResetTokenRepository;
 import com.example.becommerce.repository.RefreshTokenRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.security.JwtProvider;
 import com.example.becommerce.service.AuthService;
+import com.example.becommerce.service.EmailService;
 import com.example.becommerce.service.WalletService;
 import com.example.becommerce.utils.UserCodeGenerator;
 import lombok.RequiredArgsConstructor;
@@ -38,14 +41,16 @@ import java.util.UUID;
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
-    private final UserRepository              userRepository;
-    private final RefreshTokenRepository      refreshTokenRepository;
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
-    private final PasswordEncoder             passwordEncoder;
-    private final JwtProvider                 jwtProvider;
-    private final UserMapper                  userMapper;
-    private final UserCodeGenerator           codeGenerator;
-    private final WalletService               walletService;
+    private final UserRepository                        userRepository;
+    private final RefreshTokenRepository                refreshTokenRepository;
+    private final PasswordResetTokenRepository          passwordResetTokenRepository;
+    private final EmailConfirmationTokenRepository      emailConfirmationTokenRepository;
+    private final PasswordEncoder                       passwordEncoder;
+    private final JwtProvider                           jwtProvider;
+    private final UserMapper                            userMapper;
+    private final UserCodeGenerator                     codeGenerator;
+    private final WalletService                         walletService;
+    private final EmailService                          emailService;
 
     // ----------------------------------------------------------------
     // Register
@@ -92,7 +97,21 @@ public class AuthServiceImpl implements AuthService {
         walletService.createWalletForUser(user);
         log.info("New user registered: {} [{}]", user.getEmail(), user.getCode());
 
-        // 5. Issue tokens
+        // 5. Generate email confirmation token
+        String confirmationToken = UUID.randomUUID().toString();
+        EmailConfirmationToken token = EmailConfirmationToken.builder()
+                .token(confirmationToken)
+                .user(user)
+                .expiredAt(LocalDateTime.now().plusHours(24))
+                .used(false)
+                .build();
+        emailConfirmationTokenRepository.save(token);
+
+        // 6. Send confirmation email
+        emailService.sendConfirmationEmail(user.getEmail(), user.getFullName(), confirmationToken);
+        log.info("Confirmation email sent to: {}", user.getEmail());
+
+        // 7. Issue tokens
         return buildAuthResponse(user);
     }
 
@@ -271,6 +290,38 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
 
         return userMapper.toResponse(user);
+    }
+
+    // ----------------------------------------------------------------
+    // Verify Email
+    // ----------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void verifyEmail(VerifyEmailRequest request) {
+        // 1. Find valid confirmation token
+        EmailConfirmationToken confirmToken = emailConfirmationTokenRepository
+                .findByTokenAndUsedFalse(request.getToken())
+                .orElseThrow(() -> AppException.badRequest(ErrorCode.INVALID_TOKEN, "Token không hợp lệ hoặc đã được sử dụng"));
+
+        // 2. Check expiry
+        if (confirmToken.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw AppException.badRequest(ErrorCode.TOKEN_EXPIRED, "Token xác nhận email đã hết hạn");
+        }
+
+        // 3. Update user status to ACTIVE
+        User user = confirmToken.getUser();
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        // 4. Mark token as used
+        confirmToken.setUsed(true);
+        emailConfirmationTokenRepository.save(confirmToken);
+
+        // 5. Invalidate all other confirmation tokens for this user
+        emailConfirmationTokenRepository.invalidateAllByUserId(user.getId());
+
+        log.info("Email verified successfully for user: {}", user.getEmail());
     }
 
     // ----------------------------------------------------------------

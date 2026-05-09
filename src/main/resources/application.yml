@@ -45,8 +45,9 @@ jwt:
 
 # Application custom properties
 app:
-  name: BE E-Commerce
+  name: Glowup
   version: 1.0.0
+  frontend-url: http://localhost:5173
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173,http://localhost:4200
   wallet:
