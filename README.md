@@ -33,30 +33,18 @@ src/main/java/com/example/becommerce
 │   ├── enums/               # Role, UserStatus
 │   ├── User.java
 │   ├── RefreshToken.java
+│   ├── PasswordResetToken.java
+│   ├── Wallet.java
+│   ├── WalletTransaction.java
+│   └── BankAccount.java
 │   └── PasswordResetToken.java
-├── exception/               # AppException, GlobalExceptionHandler
-├── repository/              # UserRepository, RefreshTokenRepository, PasswordResetTokenRepository
 ├── security/                # JwtProvider, JwtAuthenticationFilter, CustomUserDetails(Service), EntryPoint
+├── repository/              # UserRepository, RefreshTokenRepository, PasswordResetTokenRepository
+│   └── impl/                # AuthServiceImpl, UserServiceImpl, WalletServiceImpl
+└── utils/                   # UserCodeGenerator, UserSpecification, TransactionCodeGenerator, MoneyUtils, BankAccountMaskUtils, VietQrGeneratorMock
 ├── service/                 # AuthService, UserService (interfaces)
 │   └── impl/                # AuthServiceImpl, UserServiceImpl
 └── utils/                   # UserCodeGenerator, UserSpecification
-```
-
----
-
-## 🚀 Hướng dẫn Setup & Chạy
-
-### 1. Yêu cầu hệ thống
-
-- Java 21+
-- Maven 3.9+
-- PostgreSQL 15+
-
-### 2. Tạo Database
-
-```sql
-CREATE DATABASE be_ecommerce;
-```
 
 Sau đó chạy file schema (tuỳ chọn — JPA sẽ tự tạo bảng với `ddl-auto: update`):
 
@@ -164,44 +152,25 @@ Server sẽ khởi động tại: `http://localhost:8080`
 | PATCH | `/api/users/{id}` | Any | Cập nhật profile |
 | PATCH | `/api/users/{id}/status` | ADMIN | Cập nhật trạng thái |
 
----
+### Wallet — Protected (`/api/wallet/**`)
 
-## 📦 Response Format
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/api/wallet` | Lấy ví hiện tại, auto-create nếu chưa có |
+| GET | `/api/wallet/transactions?type=all&page=1&limit=10` | Lịch sử giao dịch, phân trang, lọc theo type |
+| POST | `/api/wallet/topup` | Nạp tiền — tạo giao dịch + QR (VietQR) hoặc redirect (VNPay, MoMo) |
+| POST | `/api/wallet/topup/confirm` | Xác nhận nạp tiền VietQR (trước khi callback) |
+| POST | `/api/wallet/withdraw` | Rút tiền về ngân hàng — trừ balance, cộng pending_balance |
+| GET | `/api/wallet/bank-accounts` | Danh sách tài khoản ngân hàng của user |
+| POST | `/api/wallet/bank-accounts` | Tạo tài khoản ngân hàng mới |
+| DELETE | `/api/wallet/bank-accounts/{id}` | Xóa tài khoản ngân hàng |
 
-### Thành công
+### Payment Webhook — Public (`/api/payments/**`)
 
-```json
-{
-  "success": true,
-  "data": { }
-}
-```
-
-### Lỗi
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Thông báo lỗi"
-  }
-}
-```
-
-### Validation error
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Dữ liệu không hợp lệ",
-    "fields": {
-      "email": "Email đã được sử dụng"
-    }
-  }
-}
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/api/payments/vnpay/ipn` | VNPay IPN callback — verify signature, credit wallet |
+| POST | `/api/payments/momo/ipn` | MoMo IPN callback — verify signature, credit wallet |
 ```
 
 ### Danh sách có phân trang
@@ -329,6 +298,41 @@ password_reset_tokens
 ├── expired_at
 ├── used (BOOLEAN)
 └── user_id (FK → users.id)
+
+wallets
+├── id (PK)
+├── user_id (FK → users.id, UNIQUE)
+├── balance
+├── pending_balance
+├── total_earned
+├── total_withdrawn
+├── currency
+└── created_at, updated_at
+
+bank_accounts
+├── id (PK)
+├── code (UNIQUE)
+├── user_id (FK → users.id)
+├── bank_name
+├── account_number
+├── account_owner
+├── is_default
+└── created_at
+
+wallet_transactions
+├── id (PK)
+├── transaction_code (UNIQUE)
+├── wallet_id (FK → wallets.id)
+├── type
+├── category
+├── title
+├── amount, fee, net_amount
+├── status
+├── payment_method
+├── bank_account_id (FK → bank_accounts.id)
+├── transfer_content
+├── qr_code
+└── expired_at, processed_at, created_at
 ```
 
 ---
@@ -344,21 +348,56 @@ password_reset_tokens
 
 ---
 
-## 📁 Import Postman Collection
+## 💳 Payment Gateway Integration
 
-File collection: [`docs/postman_collection.json`](./docs/postman_collection.json)
+### 📍 Status: Finalized (VNPay Only)
 
-1. Mở Postman → **Import** → chọn file JSON
-2. Tạo Environment với biến:
-   - `BASE_URL` = `http://localhost:8080`
-   - `ACCESS_TOKEN` = (tự điền sau khi login)
-   - `REFRESH_TOKEN` = (tự điền sau khi login)
+Payment module hiện chỉ hỗ trợ **VNPay** (giải pháp thanh toán tiêu chuẩn cho các nền tảng e-commerce VN).
+
+### VNPay Flow
+
+```
+1. User POST /api/wallet/topup
+   ↓
+2. WalletService creates transaction (status: AWAITING_PAYMENT)
+   ↓
+3. PaymentGatewayService generates checkout URL + signature
+   ↓
+4. FE redirects user to VNPay → Payment page
+   ↓
+5. User completes payment
+   ↓
+6. VNPay callback → GET /api/payments/vnpay/ipn
+   ↓
+7. Signature verification + idempotency check
+   ↓
+8. If success: confirmTopupAndCreditWallet() → Balance += amount
+   ↓
+9. FE polls transaction status / redirect to result page
+```
+
+### Configuration
+
+```yaml
+app:
+  payment:
+    vnpay:
+      tmn-code: "YOUR_TMN_CODE"           # Merchant code from VNPay
+      secret-key: "YOUR_SECRET_KEY"       # Secret for HMAC-SHA512
+      pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"  # Sandbox
+      # For production:
+      # pay-url: "https://vnpayment.vn/paymentv2/vpcpay.html"
+      return-url: "http://localhost:3000/wallet/topup-result"
+      ip-address: "127.0.0.1"             # Server IP for VNPay logging
+```
+
+### Security on Webhooks
+
+- ✅ **HMAC-SHA512 signature** verification mandatory
+- ✅ **Idempotent processing** — duplicate IPN callbacks ignored
+- ✅ **Amount validation** — IPN amount must match transaction
+- ✅ **Transaction code match** — Prevents tampering
+- ✅ **Status tracking** — Prevents double-crediting
 
 ---
 
-## 📝 Lưu ý
-
-- JPA `ddl-auto: update` sẽ tự tạo/cập nhật bảng khi khởi động
-- Refresh token được lưu trong DB để hỗ trợ logout thực sự
-- Soft delete: user không bị xóa thực sự mà chỉ set `deleted = true`
-- Password reset token chỉ dùng được 1 lần và hết hạn sau 1 giờ

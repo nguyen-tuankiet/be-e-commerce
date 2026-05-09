@@ -49,6 +49,24 @@ app:
   version: 1.0.0
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173,http://localhost:4200
+  wallet:
+    default-currency: VND
+    topup-min-amount: 10000
+    withdraw-min-amount: 50000
+    withdraw-fee: 5000
+    topup-expiry-minutes: 30
+    qr:
+      bank-name: Techcombank
+      account-name: GLOWUP SERVICE
+      account-number: 123456789
+      transfer-prefix: VQR-GLOWUP-03
+  payment:
+    vnpay:
+      tmn-code: ${VNPAY_TMN_CODE:}
+      secret-key: ${VNPAY_SECRET_KEY:}
+      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      return-url: ${VNPAY_RETURN_URL:http://localhost:3000/wallet/topup-result}
+      ip-address: ${VNPAY_IP_ADDRESS:127.0.0.1}
 
 logging:
   level:
