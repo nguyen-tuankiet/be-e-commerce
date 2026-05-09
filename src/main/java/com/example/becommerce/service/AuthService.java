@@ -30,4 +30,7 @@ public interface AuthService {
 
     /** Return current authenticated user's profile. */
     UserResponse getCurrentUser(String bearerToken);
+
+    /** Verify email with confirmation token. */
+    void verifyEmail(VerifyEmailRequest request);
 }

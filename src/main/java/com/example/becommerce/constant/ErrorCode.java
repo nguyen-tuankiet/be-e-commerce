@@ -16,16 +16,18 @@ public final class ErrorCode {
     public static final String UNAUTHORIZED          = "UNAUTHORIZED";
 
     // Auth
-    public static final String EMAIL_ALREADY_EXISTS    = "EMAIL_ALREADY_EXISTS";
-    public static final String PHONE_ALREADY_EXISTS    = "PHONE_ALREADY_EXISTS";
-    public static final String INVALID_CREDENTIALS     = "INVALID_CREDENTIALS";
-    public static final String INVALID_TOKEN           = "INVALID_TOKEN";
-    public static final String TOKEN_EXPIRED           = "TOKEN_EXPIRED";
-    public static final String TOKEN_REVOKED           = "TOKEN_REVOKED";
-    public static final String ROLE_NOT_ALLOWED        = "ROLE_NOT_ALLOWED";
-    public static final String ACCOUNT_LOCKED          = "ACCOUNT_LOCKED";
-    public static final String ACCOUNT_DISABLED        = "ACCOUNT_DISABLED";
-    public static final String PASSWORDS_DO_NOT_MATCH  = "PASSWORDS_DO_NOT_MATCH";
+    public static final String EMAIL_ALREADY_EXISTS      = "EMAIL_ALREADY_EXISTS";
+    public static final String PHONE_ALREADY_EXISTS      = "PHONE_ALREADY_EXISTS";
+    public static final String INVALID_CREDENTIALS       = "INVALID_CREDENTIALS";
+    public static final String INVALID_TOKEN             = "INVALID_TOKEN";
+    public static final String TOKEN_EXPIRED             = "TOKEN_EXPIRED";
+    public static final String TOKEN_REVOKED             = "TOKEN_REVOKED";
+    public static final String ROLE_NOT_ALLOWED          = "ROLE_NOT_ALLOWED";
+    public static final String ACCOUNT_LOCKED            = "ACCOUNT_LOCKED";
+    public static final String ACCOUNT_DISABLED          = "ACCOUNT_DISABLED";
+    public static final String PASSWORDS_DO_NOT_MATCH    = "PASSWORDS_DO_NOT_MATCH";
+    public static final String EMAIL_NOT_VERIFIED        = "EMAIL_NOT_VERIFIED";
+    public static final String EMAIL_VERIFICATION_FAILED = "EMAIL_VERIFICATION_FAILED";
 
     // User
     public static final String USER_NOT_FOUND          = "USER_NOT_FOUND";

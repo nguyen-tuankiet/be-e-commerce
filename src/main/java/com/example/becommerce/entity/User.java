@@ -84,6 +84,9 @@ public class User {
     private List<RefreshToken> refreshTokens;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<EmailConfirmationToken> emailConfirmationTokens;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<PasswordResetToken> passwordResetTokens;
 
     @OneToOne(mappedBy = "user")

@@ -108,4 +108,16 @@ public class AuthController {
         UserResponse data = authService.getCurrentUser(authHeader);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
+
+    // ----------------------------------------------------------------
+    // POST /api/auth/verify-email
+    // ----------------------------------------------------------------
+
+    @PostMapping(ApiConstant.AUTH_VERIFY_EMAIL)
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request) {
+
+        authService.verifyEmail(request);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
 }
