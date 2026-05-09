@@ -11,6 +11,7 @@ public final class ApiConstant {
     public static final String AUTH_BASE     = BASE_API + "/auth";
     public static final String USER_BASE     = BASE_API + "/users";
     public static final String WALLET_BASE   = BASE_API + "/wallet";
+    public static final String NOTIFICATION_BASE = BASE_API + "/notifications";
 
     // Auth endpoints
     public static final String AUTH_REGISTER         = "/register";
@@ -30,4 +31,8 @@ public final class ApiConstant {
     public static final String WALLET_TOPUP_CONFIRM  = "/topup/confirm";
     public static final String WALLET_WITHDRAW       = "/withdraw";
     public static final String WALLET_BANK_ACCOUNTS  = "/bank-accounts";
+
+    // Notification endpoints
+    public static final String NOTIFICATION_MARK_READ = "/{id}/read";
+    public static final String NOTIFICATION_MARK_ALL_READ = "/read-all";
 }

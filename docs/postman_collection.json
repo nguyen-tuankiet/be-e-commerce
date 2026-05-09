@@ -323,6 +323,51 @@
           }
         }
       ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/notifications?page=1&limit=20",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/notifications/NOTIF-20260507-0001/read",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "notifications", "NOTIF-20260507-0001", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark All Notifications As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/notifications/read-all",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "notifications", "read-all"]
+            }
+          }
+        }
+      ]
     }
   ]
 }

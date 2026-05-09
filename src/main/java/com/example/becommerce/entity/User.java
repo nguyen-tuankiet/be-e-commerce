@@ -90,4 +90,7 @@ public class User {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Wallet wallet;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<Notification> notifications;
 }
