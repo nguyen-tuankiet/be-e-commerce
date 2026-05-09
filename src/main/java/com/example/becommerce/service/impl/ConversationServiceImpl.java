@@ -3,16 +3,22 @@ package com.example.becommerce.service.impl;
 import com.example.becommerce.constant.ErrorCode;
 import com.example.becommerce.dto.mapper.ConversationMapper;
 import com.example.becommerce.dto.mapper.MessageMapper;
+import com.example.becommerce.dto.mapper.QuoteMapper;
+import com.example.becommerce.dto.response.QuoteResponse;
 import com.example.becommerce.dto.response.ConversationResponse;
 import com.example.becommerce.dto.response.MessageResponse;
 import com.example.becommerce.entity.Conversation;
 import com.example.becommerce.entity.Message;
 import com.example.becommerce.entity.Order;
+import com.example.becommerce.entity.Quote;
 import com.example.becommerce.entity.User;
+import com.example.becommerce.entity.enums.MessageType;
+import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.ConversationRepository;
 import com.example.becommerce.repository.MessageRepository;
 import com.example.becommerce.repository.OrderRepository;
+import com.example.becommerce.repository.QuoteRepository;
 import com.example.becommerce.security.CustomUserDetails;
 import com.example.becommerce.service.ConversationService;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +38,10 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final OrderRepository orderRepository;
+    private final QuoteRepository quoteRepository;
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
+    private final QuoteMapper quoteMapper;
 
     @Override
     @Transactional
@@ -102,12 +110,56 @@ public class ConversationServiceImpl implements ConversationService {
         Message message = Message.builder()
                 .conversation(conversation)
                 .sender(currentUser)
+                .type(MessageType.TEXT)
                 .content(content)
                 .build();
         message = messageRepository.save(message);
         log.info("Message sent by user [{}] in conversation [{}]", currentUser.getCode(), conversationId);
 
         return messageMapper.toResponse(message);
+    }
+
+    @Override
+    @Transactional
+    public QuoteResponse createQuote(Long conversationId, Long amount, String description) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy hội thoại với id: " + conversationId));
+
+        User currentUser = getCurrentUser();
+        verifyTechnicianOwnsConversation(conversation, currentUser);
+
+        Quote quote = Quote.builder()
+                .conversation(conversation)
+                .amount(amount)
+                .description(description)
+                .build();
+        quote = quoteRepository.save(quote);
+
+        Message message = Message.builder()
+                .conversation(conversation)
+                .sender(currentUser)
+                .type(MessageType.QUOTE)
+                .content(description)
+                .quoteId(quote.getId())
+                .build();
+        messageRepository.save(message);
+
+        log.info("Quote [{}] created by technician [{}] in conversation [{}]",
+                quote.getId(), currentUser.getCode(), conversationId);
+
+        return quoteMapper.toResponse(quote);
+    }
+
+    private void verifyTechnicianOwnsConversation(Conversation conversation, User user) {
+        if (user.getRole() != Role.TECHNICIAN) {
+            throw AppException.forbidden("Chỉ thợ mới có thể gửi báo giá");
+        }
+        Order order = conversation.getOrder();
+        if (order.getTechnician() == null
+                || !order.getTechnician().getId().equals(user.getId())) {
+            throw AppException.badRequest(ErrorCode.ORDER_NOT_OWN_TECHNICIAN,
+                    "Bạn không phải thợ phụ trách đơn hàng này");
+        }
     }
 
     private void verifyParticipant(Order order, User user) {

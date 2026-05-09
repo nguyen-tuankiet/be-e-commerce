@@ -67,4 +67,8 @@ public final class ErrorCode {
     // Conversation
     public static final String CONVERSATION_NOT_FOUND          = "CONVERSATION_NOT_FOUND";
     public static final String CONVERSATION_FORBIDDEN          = "CONVERSATION_FORBIDDEN";
+
+    // Quote
+    public static final String QUOTE_NOT_FOUND                 = "QUOTE_NOT_FOUND";
+    public static final String QUOTE_ALREADY_PROCESSED         = "QUOTE_ALREADY_PROCESSED";
 }

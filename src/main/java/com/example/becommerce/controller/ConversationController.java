@@ -1,11 +1,13 @@
 package com.example.becommerce.controller;
 
 import com.example.becommerce.constant.ApiConstant;
+import com.example.becommerce.dto.request.CreateQuoteRequest;
 import com.example.becommerce.dto.request.OrderIdRequest;
 import com.example.becommerce.dto.request.SendMessageRequest;
 import com.example.becommerce.dto.response.ApiResponse;
 import com.example.becommerce.dto.response.ConversationResponse;
 import com.example.becommerce.dto.response.MessageResponse;
+import com.example.becommerce.dto.response.QuoteResponse;
 import com.example.becommerce.service.ConversationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,14 @@ public class ConversationController {
             @PathVariable Long id,
             @Valid @RequestBody SendMessageRequest request) {
         MessageResponse data = conversationService.sendMessage(id, request.getContent());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(data));
+    }
+
+    @PostMapping("/{id}/quotes")
+    public ResponseEntity<ApiResponse<QuoteResponse>> createQuote(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateQuoteRequest request) {
+        QuoteResponse data = conversationService.createQuote(id, request.getAmount(), request.getDescription());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(data));
     }
 }

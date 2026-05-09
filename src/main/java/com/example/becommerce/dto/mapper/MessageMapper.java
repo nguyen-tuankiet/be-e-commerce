@@ -13,7 +13,9 @@ public class MessageMapper {
                 .id(message.getId())
                 .senderId(message.getSender().getId())
                 .senderName(message.getSender().getFullName())
+                .type(message.getType().name().toLowerCase())
                 .content(message.getContent())
+                .quoteId(message.getQuoteId())
                 .createdAt(message.getCreatedAt())
                 .build();
     }

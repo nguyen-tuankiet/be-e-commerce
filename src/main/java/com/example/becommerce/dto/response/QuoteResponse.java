@@ -7,13 +7,12 @@ import java.time.LocalDateTime;
 
 @Getter
 @Builder
-public class MessageResponse {
+public class QuoteResponse {
 
     private Long id;
-    private Long senderId;
-    private String senderName;
-    private String type;
-    private String content;
-    private Long quoteId;
+    private Long conversationId;
+    private Long amount;
+    private String description;
+    private String status;
     private LocalDateTime createdAt;
 }
