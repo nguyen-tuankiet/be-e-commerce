@@ -71,4 +71,7 @@ public final class ErrorCode {
     // Quote
     public static final String QUOTE_NOT_FOUND                 = "QUOTE_NOT_FOUND";
     public static final String QUOTE_ALREADY_PROCESSED         = "QUOTE_ALREADY_PROCESSED";
+
+    // Review
+    public static final String REVIEW_ALREADY_EXISTS           = "REVIEW_ALREADY_EXISTS";
 }

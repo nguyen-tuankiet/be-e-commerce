@@ -26,6 +26,7 @@ public class UserResponse {
     private String district;
     private String address;
     private String bio;
+    private Double averageRating;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
