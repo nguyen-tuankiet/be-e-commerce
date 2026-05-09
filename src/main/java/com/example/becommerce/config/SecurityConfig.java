@@ -86,6 +86,9 @@ public class SecurityConfig {
                 // Order module — authenticated user only
                 .requestMatchers(ApiConstant.ORDER_BASE + "/**").authenticated()
 
+                // Conversation module — authenticated user only
+                .requestMatchers(ApiConstant.CONVERSATION_BASE + "/**").authenticated()
+
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 

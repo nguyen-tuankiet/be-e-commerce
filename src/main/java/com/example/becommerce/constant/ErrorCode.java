@@ -63,4 +63,8 @@ public final class ErrorCode {
     public static final String ORDER_ALREADY_ASSIGNED          = "ORDER_ALREADY_ASSIGNED";
     public static final String ORDER_NOT_OWN_CUSTOMER          = "ORDER_NOT_OWN_CUSTOMER";
     public static final String ORDER_EXTRA_COST_EXISTS         = "ORDER_EXTRA_COST_EXISTS";
+
+    // Conversation
+    public static final String CONVERSATION_NOT_FOUND          = "CONVERSATION_NOT_FOUND";
+    public static final String CONVERSATION_FORBIDDEN          = "CONVERSATION_FORBIDDEN";
 }
