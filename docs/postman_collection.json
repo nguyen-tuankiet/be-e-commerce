@@ -368,6 +368,314 @@
           }
         }
       ]
+    },
+    {
+      "name": "Technicians",
+      "item": [
+        {
+          "name": "1. Register as Technician",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"experienceYears\": 5,\n  \"bio\": \"Sửa điện lạnh chuyên nghiệp, kinh nghiệm 5 năm\",\n  \"serviceIds\": [1, 2, 3],\n  \"workingAreas\": [\n    \"HN:Hà Đông\",\n    \"HN:Ba Đình\",\n    \"HN:Tây Hồ\"\n  ],\n  \"basePrice\": 150000,\n  \"hourlyRate\": 50000\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "register"]
+            }
+          }
+        },
+        {
+          "name": "2. Get Public Technicians List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians?keyword=&serviceId=&province=&district=&minRating=&available=true&page=0&size=10&sortBy=ratingAverage&sortDir=DESC",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians"],
+              "query": [
+                { "key": "keyword", "value": "", "disabled": true },
+                { "key": "serviceId", "value": "", "disabled": true },
+                { "key": "province", "value": "", "disabled": true },
+                { "key": "district", "value": "", "disabled": true },
+                { "key": "minRating", "value": "", "disabled": true },
+                { "key": "available", "value": "true", "disabled": true },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "sortBy", "value": "ratingAverage", "disabled": true },
+                { "key": "sortDir", "value": "DESC", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Get Technician Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "1"]
+            }
+          }
+        },
+        {
+          "name": "4. Update Technician Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phone\": \"0912345678\",\n  \"avatarUrl\": \"https://avatar.jpg\",\n  \"bio\": \"Sửa điện lạnh 5 năm kinh nghiệm, giỏi tay\",\n  \"experienceYears\": 6,\n  \"serviceIds\": [1, 2, 3, 4],\n  \"workingAreas\": [\n    \"HN:Hà Đông\",\n    \"HN:Ba Đình\"\n  ],\n  \"basePrice\": 180000,\n  \"hourlyRate\": 60000\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/1/profile",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "1", "profile"]
+            }
+          }
+        },
+        {
+          "name": "5. Update Availability",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"available\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/1/availability",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "1", "availability"]
+            }
+          }
+        },
+        {
+          "name": "6. Get Technician Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/1/reviews?page=0&size=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "1", "reviews"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Get Technician Schedule",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/technicians/1/schedule?fromDate=2024-03-01&toDate=2024-03-31",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "technicians", "1", "schedule"],
+              "query": [
+                { "key": "fromDate", "value": "2024-03-01" },
+                { "key": "toDate", "value": "2024-03-31" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verifications",
+      "item": [
+        {
+          "name": "1. Submit KYC Verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Trần Thị Lan\",\n  \"phone\": \"0912345678\",\n  \"email\": \"lan@gmail.com\",\n  \"district\": \"Quận 1\",\n  \"city\": \"Hồ Chí Minh\",\n  \"yearsExperience\": 5\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/verifications", "host": ["{{BASE_URL}}"], "path": ["api", "verifications"] }
+          }
+        },
+        {
+          "name": "2. Get All Verifications (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/verifications?status=PENDING&page=0&size=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "verifications"],
+              "query": [
+                { "key": "status", "value": "PENDING" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Get Verification Detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/verifications/1", "host": ["{{BASE_URL}}"], "path": ["api", "verifications", "1"] }
+          }
+        },
+        {
+          "name": "4. Approve Verification (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\",\n  \"note\": \"Tài liệu KYC đạt yêu cầu\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/verifications/1", "host": ["{{BASE_URL}}"], "path": ["api", "verifications", "1"] }
+          }
+        },
+        {
+          "name": "5. Get Technician Verification",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/verifications/technician/1", "host": ["{{BASE_URL}}"], "path": ["api", "verifications", "technician", "1"] }
+          }
+        },
+        {
+          "name": "6. Upload KYC Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docType\": \"ID_FRONT\",\n  \"documentUrl\": \"https://s3.amazonaws.com/bucket/id_front_123.jpg\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/verifications/1/documents", "host": ["{{BASE_URL}}"], "path": ["api", "verifications", "1", "documents"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Warranty",
+      "item": [
+        {
+          "name": "1. Create Warranty Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": 1,\n  \"description\": \"Máy lạnh không lạnh sau 2 tuần\",\n  \"warrantyDays\": 90\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/warranty", "host": ["{{BASE_URL}}"], "path": ["api", "warranty"] }
+          }
+        },
+        {
+          "name": "2. Get Warranty Claim",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": { "raw": "{{BASE_URL}}/api/warranty/orders/1", "host": ["{{BASE_URL}}"], "path": ["api", "warranty", "orders", "1"] }
+          }
+        },
+        {
+          "name": "3. Update Warranty Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\",\n  \"note\": \"Thợ đang kiểm tra máy lạnh\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/warranty/1/status", "host": ["{{BASE_URL}}"], "path": ["api", "warranty", "1", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "1. Create Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": 1,\n  \"againstId\": 2,\n  \"reason\": \"EXTRA_FEE\",\n  \"description\": \"Thợ tính thêm phí không được phép\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/reports", "host": ["{{BASE_URL}}"], "path": ["api", "reports"] }
+          }
+        },
+        {
+          "name": "2. Get All Reports (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/reports?status=OPEN&page=0&size=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "reports"],
+              "query": [
+                { "key": "status", "value": "OPEN" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Update Report Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\",\n  \"resolutionNote\": \"Đã xác minh, thợ sẽ hoàn tiền cho khách\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/api/reports/1/status", "host": ["{{BASE_URL}}"], "path": ["api", "reports", "1", "status"] }
+          }
+        }
+      ]
     }
   ]
 }

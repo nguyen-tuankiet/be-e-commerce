@@ -11,10 +11,12 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Wallet aggregate root.
  * One user can own exactly one wallet.
+ * Primary key is user_id (UUID) to enforce one-to-one relationship.
  */
 @Entity
 @Table(name = "wallets",
@@ -29,11 +31,10 @@ import java.time.LocalDateTime;
 public class Wallet {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID userId;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", nullable = false, insertable = false, updatable = false)
     private User user;
 
     @Column(nullable = false, precision = 19, scale = 0)
@@ -60,11 +61,11 @@ public class Wallet {
     private Long version;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }
 

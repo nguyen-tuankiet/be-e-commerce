@@ -1,10 +1,10 @@
 package com.example.becommerce.entity.enums;
 
 public enum OrderStatus {
-    PENDING,
-    ACCEPTED,
+    NEW,
+    ASSIGNED,
+    SCHEDULED,
     IN_PROGRESS,
-    WAITING_FOR_PRICE_APPROVAL,
     COMPLETED,
     CANCELLED
 }

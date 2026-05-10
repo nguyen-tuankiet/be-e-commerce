@@ -6,16 +6,23 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Core user entity mapped to the 'users' table.
- * Supports soft delete via the 'deleted' flag.
+ * Uses UUID for distributed system support.
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_role", columnList = "role"),
+        @Index(name = "idx_users_status", columnList = "status"),
+        @Index(name = "idx_users_role_status", columnList = "role, status"),
+        @Index(name = "idx_users_status_created_at", columnList = "status, created_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,64 +31,68 @@ import java.util.List;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator
+    private UUID id;
 
     /**
-     * Human-readable unique code, e.g. USR-001.
+     * Human-readable unique code, e.g. USR-001, TECH-001, GLW-9921
      */
-    @Column(unique = true, nullable = false, length = 20)
+    @Column(unique = true, nullable = false, length = 32)
     private String code;
 
-    @Column(name = "full_name", nullable = false)
+    @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 255)
     private String email;
 
-    @Column(unique = true, nullable = false, length = 15)
+    @Column(unique = true, nullable = false, length = 20)
     private String phone;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String passwordHash;
 
-    private String avatar;
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    private String avatarUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private Role role;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @Builder.Default
     private UserStatus status = UserStatus.PENDING;
 
-    private String district;
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
 
-    @Column(columnDefinition = "TEXT")
-    private String address;
+    @Column(name = "phone_verified_at")
+    private LocalDateTime phoneVerifiedAt;
 
-    @Column(columnDefinition = "TEXT")
-    private String bio;
+    @Column(name = "last_active_at")
+    private LocalDateTime lastActiveAt;
 
-    @Column(name = "average_rating")
-    private Double averageRating;
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(columnDefinition = "jsonb")
+    private String metadata;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    /** Soft delete flag — true means logically deleted. */
-    @Builder.Default
-    private boolean deleted = false;
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
-    // ----------------------------------------------------------------
-    // Relationships
-    // ----------------------------------------------------------------
+    // ================================================================
+    // RELATIONSHIPS
+    // ================================================================
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<RefreshToken> refreshTokens;
@@ -97,6 +108,14 @@ public class User {
     @EqualsAndHashCode.Exclude
     private Wallet wallet;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private TechnicianProfile technicianProfile;
+
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<Notification> notifications;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<BankAccount> bankAccounts;
 }

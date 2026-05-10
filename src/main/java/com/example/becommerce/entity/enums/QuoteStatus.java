@@ -1,7 +1,8 @@
 package com.example.becommerce.entity.enums;
 
-public enum QuoteStatus {
+public enum QuotationStatus {
     PENDING,
     ACCEPTED,
-    REJECTED
+    REJECTED,
+    EXPIRED
 }

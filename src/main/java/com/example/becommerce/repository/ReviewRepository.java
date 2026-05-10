@@ -1,6 +1,8 @@
 package com.example.becommerce.repository;
 
 import com.example.becommerce.entity.Review;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +20,9 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
 
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.technicianId = :technicianId")
     Double averageRatingByTechnicianId(@Param("technicianId") Long technicianId);
+
+    /**
+     * Find all reviews for a technician, paginated
+     */
+    Page<Review> findByTechnicianId(Long technicianId, Pageable pageable);
 }
