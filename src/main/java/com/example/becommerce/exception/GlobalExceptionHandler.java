@@ -2,6 +2,7 @@ package com.example.becommerce.exception;
 
 import com.example.becommerce.constant.ErrorCode;
 import com.example.becommerce.dto.response.ApiResponse;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,19 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.validationError(
                 "Dữ liệu không hợp lệ", fieldErrors);
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest request) {
+
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getConstraintViolations().forEach(error ->
+                fieldErrors.put(error.getPropertyPath().toString(), error.getMessage()));
+
+        log.warn("Constraint violation on {}: {}", request.getRequestURI(), fieldErrors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.validationError("Dữ liệu không hợp lệ", fieldErrors));
     }
 
     // ---- Business exceptions -----------------------------------------

@@ -68,6 +68,9 @@ app:
       pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       return-url: ${VNPAY_RETURN_URL:http://localhost:3000/wallet/topup-result}
       ip-address: ${VNPAY_IP_ADDRESS:127.0.0.1}
+  upload:
+    base-dir: ${UPLOAD_BASE_DIR:uploads}
+    public-url: ${UPLOAD_PUBLIC_URL:/uploads}
 
 logging:
   level:

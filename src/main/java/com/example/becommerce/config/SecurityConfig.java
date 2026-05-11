@@ -69,8 +69,15 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers(ApiConstant.AUTH_BASE + "/**").permitAll()
                 .requestMatchers("/api/payments/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
 
                 // Admin-only
+                .requestMatchers("/api/admin/**").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.POST, "/api/categories").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.PUT, "/api/categories/*").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.DELETE, "/api/categories/*").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.PATCH, "/api/categories/*/status").hasRole(RoleConstant.ADMIN)
                 .requestMatchers(HttpMethod.PATCH, ApiConstant.USER_BASE + "/*/status")
                         .hasRole(RoleConstant.ADMIN)
 
@@ -82,6 +89,8 @@ public class SecurityConfig {
 
                 // Notification module — authenticated user only
                 .requestMatchers(ApiConstant.NOTIFICATION_BASE + "/**").authenticated()
+
+                .requestMatchers("/api/upload/**").authenticated()
 
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()

@@ -53,4 +53,17 @@ public final class ErrorCode {
     // Notification
     public static final String NOTIFICATION_NOT_FOUND           = "NOTIFICATION_NOT_FOUND";
     public static final String NOTIFICATION_CREATE_FAILED       = "NOTIFICATION_CREATE_FAILED";
+
+    // Category
+    public static final String CATEGORY_NOT_FOUND               = "CATEGORY_NOT_FOUND";
+    public static final String INVALID_CATEGORY_PRIORITY        = "INVALID_CATEGORY_PRIORITY";
+
+    // Admin finance
+    public static final String INVALID_WITHDRAW_REQUEST         = "INVALID_WITHDRAW_REQUEST";
+
+    // File upload
+    public static final String INVALID_FILE                     = "INVALID_FILE";
+    public static final String INVALID_FILE_TYPE                = "INVALID_FILE_TYPE";
+    public static final String INVALID_FILE_FOLDER              = "INVALID_FILE_FOLDER";
+    public static final String FILE_UPLOAD_FAILED               = "FILE_UPLOAD_FAILED";
 }
