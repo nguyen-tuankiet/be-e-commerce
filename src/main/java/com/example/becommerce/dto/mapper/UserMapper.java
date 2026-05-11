@@ -28,6 +28,7 @@ public class UserMapper {
                 .district(user.getDistrict())
                 .address(user.getAddress())
                 .bio(user.getBio())
+                .averageRating(user.getAverageRating())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

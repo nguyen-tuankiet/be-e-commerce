@@ -81,6 +81,13 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         Review saved = reviewRepository.save(review);
+
+        // Refresh denormalized averageRating on the technician for fast listing.
+        User technician = order.getTechnician();
+        Double avg = reviewRepository.averageRatingByTechnician(technician.getId());
+        technician.setAverageRating(avg == null ? 0d : avg);
+        userRepository.save(technician);
+
         log.info("Review {} created on order {} by customer {}", saved.getCode(), order.getCode(), customer.getCode());
         return reviewMapper.toResponse(saved);
     }
