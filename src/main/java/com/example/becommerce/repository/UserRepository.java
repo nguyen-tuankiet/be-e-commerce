@@ -34,6 +34,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT COUNT(u) FROM User u")
     long countAll();
 
+    Optional<User> findByCodeAndDeletedFalse(String code);
+
+    long countByRoleAndStatusAndDeletedFalse(Role role, UserStatus status);
+
     Page<User> findByRoleAndStatusAndDistrictContainingIgnoreCaseAndFullNameContainingIgnoreCaseAndDeletedFalse(
             Role role, UserStatus status, String district, String keyword, Pageable pageable);
 }

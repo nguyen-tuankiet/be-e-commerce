@@ -2,8 +2,8 @@ package com.example.becommerce.service.impl;
 
 import com.example.becommerce.constant.ErrorCode;
 import com.example.becommerce.dto.mapper.ReviewMapper;
-import com.example.becommerce.dto.response.PagedResponse;
-import com.example.becommerce.dto.response.ReviewResponse;
+import com.example.becommerce.dto.request.review.CreateReviewRequest;
+import com.example.becommerce.dto.response.review.ReviewResponse;
 import com.example.becommerce.entity.Order;
 import com.example.becommerce.entity.Review;
 import com.example.becommerce.entity.User;
@@ -13,114 +13,99 @@ import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.OrderRepository;
 import com.example.becommerce.repository.ReviewRepository;
 import com.example.becommerce.repository.UserRepository;
-import com.example.becommerce.security.CustomUserDetails;
 import com.example.becommerce.service.ReviewService;
-import com.example.becommerce.utils.ReviewSpecification;
+import com.example.becommerce.utils.ReviewCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
+/**
+ * Business rules for customer reviews:
+ *  - Only the customer that placed the order can review it.
+ *  - The order must be COMPLETED.
+ *  - One review per order.
+ *  - The technician on the order is the one being rated.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ReviewServiceImpl implements ReviewService {
 
-    private final ReviewRepository reviewRepository;
-    private final OrderRepository orderRepository;
-    private final UserRepository userRepository;
-    private final ReviewMapper reviewMapper;
+    private final ReviewRepository    reviewRepository;
+    private final OrderRepository     orderRepository;
+    private final UserRepository      userRepository;
+    private final ReviewMapper        reviewMapper;
+    private final ReviewCodeGenerator codeGenerator;
 
     @Override
     @Transactional
-    public ReviewResponse createReview(Long orderId, Integer rating, String comment) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng với id: " + orderId));
-
+    public ReviewResponse createReview(String orderCode, CreateReviewRequest request) {
         User customer = getCurrentUser();
+        Order order = findOrder(orderCode);
+
         if (customer.getRole() != Role.CUSTOMER) {
-            throw AppException.forbidden("Chỉ khách hàng mới có thể đánh giá");
+            throw AppException.forbidden("Chỉ khách hàng mới có thể đánh giá đơn");
         }
-        if (!order.getCustomer().getId().equals(customer.getId())) {
-            throw AppException.forbidden("Bạn không phải chủ của đơn hàng này");
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customer.getId())) {
+            throw AppException.forbidden("Bạn không phải khách hàng của đơn này");
         }
         if (order.getStatus() != OrderStatus.COMPLETED) {
-            throw AppException.badRequest(ErrorCode.ORDER_INVALID_STATUS,
-                    "Chỉ được đánh giá đơn hàng đã hoàn thành");
-        }
-        if (reviewRepository.existsByOrderId(orderId)) {
-            throw AppException.badRequest(ErrorCode.ORDER_INVALID_STATUS,
-                    "Đơn hàng đã được đánh giá");
+            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION,
+                    "Chỉ có thể đánh giá đơn đã hoàn thành");
         }
         if (order.getTechnician() == null) {
-            throw AppException.badRequest(ErrorCode.ORDER_INVALID_STATUS,
-                    "Đơn hàng chưa có thợ phụ trách");
+            throw AppException.badRequest(ErrorCode.VALIDATION_ERROR,
+                    "Đơn chưa có thợ thực hiện nên không thể đánh giá");
+        }
+        if (reviewRepository.existsByOrder_Id(order.getId())) {
+            throw AppException.conflict(ErrorCode.REVIEW_ALREADY_EXISTS, "Đơn này đã được đánh giá");
         }
 
         Review review = Review.builder()
-                .orderId(orderId)
-                .customerId(customer.getId())
-                .technicianId(order.getTechnician().getId())
-                .rating(rating)
-                .comment(comment)
+                .code(codeGenerator.generate())
+                .order(order)
+                .author(customer)
+                .technician(order.getTechnician())
+                .rating(request.getRating())
+                .content(request.getContent())
                 .build();
-        review = reviewRepository.save(review);
 
-        Double avg = reviewRepository.averageRatingByTechnicianId(order.getTechnician().getId());
-        User technician = order.getTechnician();
-        technician.setAverageRating(avg);
-        userRepository.save(technician);
-
-        log.info("Review created for order [{}] by customer [{}], rating={}",
-                order.getCode(), customer.getCode(), rating);
-
-        return reviewMapper.toResponse(review, customer.getFullName(), technician.getFullName());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public PagedResponse<ReviewResponse> getReviews(Integer rating, Long technicianId, int page, int limit) {
-        User currentUser = getCurrentUser();
-        if (currentUser.getRole() != Role.ADMIN) {
-            throw AppException.forbidden("Chỉ quản trị viên mới có thể xem danh sách đánh giá");
+        if (request.getAttachedImages() != null) {
+            request.getAttachedImages().stream()
+                    .filter(s -> s != null && !s.isBlank())
+                    .map(String::trim)
+                    .forEach(review.getAttachedImages()::add);
         }
 
-        Specification<Review> spec = ReviewSpecification.buildFilter(rating, technicianId);
-        Pageable pageable = PageRequest.of(Math.max(0, page - 1), limit);
+        Review saved = reviewRepository.save(review);
 
-        Page<Review> reviewPage = reviewRepository.findAll(spec, pageable);
+        // Refresh denormalized averageRating on the technician for fast listing.
+        User technician = order.getTechnician();
+        Double avg = reviewRepository.averageRatingByTechnician(technician.getId());
+        technician.setAverageRating(avg == null ? 0d : avg);
+        userRepository.save(technician);
 
-        List<ReviewResponse> items = reviewPage.getContent().stream()
-                .map(r -> {
-                    String customerName = userRepository.findById(r.getCustomerId())
-                            .map(User::getFullName).orElse(null);
-                    String technicianName = userRepository.findById(r.getTechnicianId())
-                            .map(User::getFullName).orElse(null);
-                    return reviewMapper.toResponse(r, customerName, technicianName);
-                })
-                .toList();
+        log.info("Review {} created on order {} by customer {}", saved.getCode(), order.getCode(), customer.getCode());
+        return reviewMapper.toResponse(saved);
+    }
 
-        return PagedResponse.of(items, page, limit, reviewPage.getTotalElements());
+    // ----------------------------------------------------------------
+
+    private Order findOrder(String code) {
+        return orderRepository.findByCodeAndDeletedFalse(code)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng " + code));
     }
 
     private User getCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw AppException.unauthorized("Chưa xác thực người dùng");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw AppException.unauthorized("Người dùng chưa đăng nhập");
         }
-        Object principal = auth.getPrincipal();
-        if (principal instanceof CustomUserDetails userDetails) {
-            return userDetails.getUser();
-        }
-        throw AppException.unauthorized("Không thể xác thực người dùng");
+        String email = authentication.getName();
+        return userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng hiện tại"));
     }
 }

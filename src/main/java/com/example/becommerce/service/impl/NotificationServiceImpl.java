@@ -15,6 +15,7 @@ import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.NotificationRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.service.NotificationService;
+import com.example.becommerce.service.WsEventPublisher;
 import com.example.becommerce.utils.JsonUtils;
 import com.example.becommerce.utils.NotificationCodeGenerator;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationMapper notificationMapper;
     private final NotificationCodeGenerator notificationCodeGenerator;
     private final JsonUtils jsonUtils;
+    private final WsEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -155,6 +157,16 @@ public class NotificationServiceImpl implements NotificationService {
 
             try {
                 Notification saved = notificationRepository.save(notification);
+
+                // Best-effort realtime push to the recipient.
+                eventPublisher.publishNotificationNew(
+                        user.getCode(),
+                        saved.getNotificationCode(),
+                        type.apiValue(),
+                        saved.getTitle(),
+                        saved.getBody(),
+                        data);
+
                 return notificationMapper.toResponse(saved);
             } catch (DataIntegrityViolationException ex) {
                 log.warn("Notification code collision detected for code {}", notificationCode);

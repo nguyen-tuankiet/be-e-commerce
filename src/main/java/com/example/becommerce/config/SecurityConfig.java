@@ -69,8 +69,17 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers(ApiConstant.AUTH_BASE + "/**").permitAll()
                 .requestMatchers("/api/payments/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
+                // WebSocket handshake — STOMP CONNECT carries its own JWT (see WebSocketAuthInterceptor).
+                .requestMatchers("/ws/**").permitAll()
 
                 // Admin-only
+                .requestMatchers("/api/admin/**").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.POST, "/api/categories").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.PUT, "/api/categories/*").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.DELETE, "/api/categories/*").hasRole(RoleConstant.ADMIN)
+                .requestMatchers(HttpMethod.PATCH, "/api/categories/*/status").hasRole(RoleConstant.ADMIN)
                 .requestMatchers(HttpMethod.PATCH, ApiConstant.USER_BASE + "/*/status")
                         .hasRole(RoleConstant.ADMIN)
 
@@ -83,14 +92,26 @@ public class SecurityConfig {
                 // Notification module — authenticated user only
                 .requestMatchers(ApiConstant.NOTIFICATION_BASE + "/**").authenticated()
 
-                // Order module — authenticated user only
+                // Order module — all authenticated; per-action role enforced in service
                 .requestMatchers(ApiConstant.ORDER_BASE + "/**").authenticated()
 
-                // Conversation module — authenticated user only
-                .requestMatchers(ApiConstant.CONVERSATION_BASE + "/**").authenticated()
+                // Admin reports listing — restricted at the controller via @PreAuthorize
+                .requestMatchers(ApiConstant.REPORT_BASE + "/**").authenticated()
 
-                // Quote module — authenticated user only
+                // Public technician browsing for customer marketplace; PATCH/availability
+                // are role-checked in the service layer.
+                .requestMatchers(HttpMethod.GET, ApiConstant.TECHNICIAN_BASE + "/**").permitAll()
+                .requestMatchers(ApiConstant.TECHNICIAN_BASE + "/**").authenticated()
+
+                // Verification — listing/review require ADMIN (enforced via @PreAuthorize),
+                // submission requires TECHNICIAN (enforced in service).
+                .requestMatchers(ApiConstant.VERIFICATION_BASE + "/**").authenticated()
+
+                // Chat + quote — participants only, enforced in service.
+                .requestMatchers(ApiConstant.CONVERSATION_BASE + "/**").authenticated()
                 .requestMatchers(ApiConstant.QUOTE_BASE + "/**").authenticated()
+
+                .requestMatchers("/api/upload/**").authenticated()
 
                 // Swagger/actuator (if added later)
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()

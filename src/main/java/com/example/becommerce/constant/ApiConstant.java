@@ -12,7 +12,10 @@ public final class ApiConstant {
     public static final String USER_BASE     = BASE_API + "/users";
     public static final String WALLET_BASE   = BASE_API + "/wallet";
     public static final String NOTIFICATION_BASE = BASE_API + "/notifications";
-    public static final String ORDER_BASE     = BASE_API + "/orders";
+    public static final String ORDER_BASE        = BASE_API + "/orders";
+    public static final String REPORT_BASE       = BASE_API + "/reports";
+    public static final String TECHNICIAN_BASE   = BASE_API + "/technicians";
+    public static final String VERIFICATION_BASE = BASE_API + "/verifications";
     public static final String CONVERSATION_BASE = BASE_API + "/conversations";
     public static final String QUOTE_BASE        = BASE_API + "/quotes";
 
