@@ -1,103 +1,185 @@
-# API Reference
+# GlowUp Concierge — API Reference
 
-Tài liệu tham chiếu chính thức cho các API `auth`, `user`, `wallet` và `payment` của backend.
+Tài liệu tham chiếu **toàn bộ** REST endpoints + WebSocket events của backend
+GlowUp Concierge (Spring Boot 3 + Java 21 + PostgreSQL + JWT).
 
-> Nguồn thông tin được viết lại theo code hiện tại trong `controller/`, `dto/`, `service/` và `application.yml`.
+> Đây là spec đã được implement, **không phải design draft**. Mọi request/response shape
+> dưới đây khớp với code trong `controller/`, `service/`, `dto/` và `WsEventPublisher`.
 
 ---
 
 ## 1. Tổng quan
 
-- **Base URL**: `http://localhost:8080`
-- **Context path**: `/`
-- **API prefix**: `/api`
-- **Format dữ liệu**: JSON
-- **Xác thực**: JWT Bearer token
-
-### Phân quyền hiện tại
-
-| Nhóm API | Trạng thái |
+| Hạng mục | Giá trị |
 |---|---|
-| `auth` | Public, riêng `/me` và `/logout` cần Bearer token |
-| `user` | Cần đăng nhập; `PATCH /api/users/{id}/status` chỉ `ADMIN` |
-| `wallet` | Cần đăng nhập |
-| `payment` | Public webhook cho VNPay |
+| Base URL | `http://localhost:8080` |
+| API prefix | `/api` |
+| WS endpoint | `/ws` (SockJS + STOMP) |
+| Auth | JWT Bearer (`Authorization: Bearer <accessToken>`) |
+| Content-Type | `application/json` cho phần lớn; `multipart/form-data` cho upload + verification |
+| Pagination | `?page=1&limit=10` (1-indexed); response chứa `pagination: { page, limit, total, totalPages }` |
+| Date format | ISO-8601 UTC (`2026-05-07T14:00:00.000Z`) |
+| Currency | VND, lưu **BIGINT không thập phân** |
+
+### 1.1 Response envelope
+
+```json
+// Success
+{ "success": true, "data": { ... } }
+
+// Error
+{ "success": false, "error": { "code": "...", "message": "...", "fields": { "...": "..." } } }
+```
+
+### 1.2 Authentication header
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+```
+
+Access token expire mặc định 15 phút, refresh 7 ngày — dùng `POST /api/auth/refresh-token`.
+
+### 1.3 Roles
+
+- `customer` — đặt đơn, đánh giá, tạo bảo hành/report, chat
+- `technician` — nhận đơn, báo giá, KYC submission
+- `admin` — duyệt KYC, xem báo cáo, quản lý hoa hồng
 
 ---
 
-## 2. Chuẩn response
+## 2. Quick reference (tất cả endpoints)
 
-### 2.1 `ApiResponse<T>`
+| # | Method | Path | Module | Role |
+|---|---|---|---|---|
+| **AUTH** ||||| 
+| 1 | POST | `/api/auth/register` | Auth | Public |
+| 2 | POST | `/api/auth/login` | Auth | Public |
+| 3 | POST | `/api/auth/refresh-token` | Auth | Public |
+| 4 | POST | `/api/auth/logout` | Auth | Authenticated |
+| 5 | POST | `/api/auth/forgot-password` | Auth | Public |
+| 6 | POST | `/api/auth/change-password` | Auth | Authenticated |
+| 7 | POST | `/api/auth/verify-email` | Auth | Public (token from email) |
+| 8 | GET | `/api/auth/me` | Auth | Authenticated |
+| **USER** ||||| 
+| 9 | GET | `/api/users` | User | Authenticated |
+| 10 | GET | `/api/users/:id` | User | Authenticated |
+| 11 | PATCH | `/api/users/:id` | User | Self or Admin |
+| 12 | PATCH | `/api/users/:id/status` | User | Admin |
+| **TECHNICIAN** ||||| 
+| 13 | GET | `/api/technicians` | Technician | Public |
+| 14 | GET | `/api/technicians/:id` | Technician | Public |
+| 15 | PATCH | `/api/technicians/:id/profile` | Technician | Self or Admin |
+| 16 | PATCH | `/api/technicians/:id/availability` | Technician | Self or Admin |
+| 17 | GET | `/api/technicians/:id/reviews` | Technician | Public |
+| **ORDER** ||||| 
+| 18 | GET | `/api/orders` | Order | Authenticated |
+| 19 | POST | `/api/orders` | Order | Customer |
+| 20 | GET | `/api/orders/:id` | Order | Participant or Admin |
+| 21 | PATCH | `/api/orders/:id/status` | Order | Technician/Admin |
+| 22 | POST | `/api/orders/:id/cancel` | Order | Participant or Admin |
+| 23 | POST | `/api/orders/:id/accept` | Order | Technician |
+| 24 | POST | `/api/orders/:id/reject` | Order | Technician |
+| 25 | POST | `/api/orders/:id/complete` | Order | Technician |
+| 26 | PATCH | `/api/orders/:id/price` | Order | Technician |
+| 27 | POST | `/api/orders/:id/price/approve` | Order | Customer |
+| 28 | POST | `/api/orders/:id/price/reject` | Order | Customer |
+| **REVIEW** ||||| 
+| 29 | POST | `/api/orders/:id/reviews` | Review | Customer |
+| **WARRANTY** ||||| 
+| 30 | POST | `/api/orders/:id/warranty` | Warranty | Customer |
+| 31 | GET | `/api/orders/:id/warranty` | Warranty | Participant or Admin |
+| **REPORT** ||||| 
+| 32 | POST | `/api/orders/:id/reports` | Report | Participant |
+| 33 | GET | `/api/reports` | Report | Admin |
+| **CHAT** ||||| 
+| 34 | GET | `/api/conversations` | Chat | Authenticated |
+| 35 | POST | `/api/conversations` | Chat | Customer |
+| 36 | GET | `/api/conversations/:id/messages` | Chat | Participant |
+| 37 | POST | `/api/conversations/:id/messages` | Chat | Participant |
+| **QUOTATION** ||||| 
+| 38 | POST | `/api/conversations/:id/quotes` | Quotation | Technician |
+| 39 | PATCH | `/api/quotes/:id/accept` | Quotation | Customer |
+| **WALLET** ||||| 
+| 40 | GET | `/api/wallet` | Wallet | Authenticated |
+| 41 | GET | `/api/wallet/transactions` | Wallet | Authenticated |
+| 42 | POST | `/api/wallet/topup` | Wallet | Authenticated |
+| 43 | POST | `/api/wallet/topup/confirm` | Wallet | Authenticated |
+| 44 | POST | `/api/wallet/withdraw` | Wallet | Authenticated |
+| 45 | GET | `/api/wallet/bank-accounts` | Wallet | Authenticated |
+| 46 | POST | `/api/wallet/bank-accounts` | Wallet | Authenticated |
+| 47 | DELETE | `/api/wallet/bank-accounts/:id` | Wallet | Authenticated |
+| **VERIFICATION** ||||| 
+| 48 | GET | `/api/verifications` | Verification | Admin |
+| 49 | POST | `/api/verifications` | Verification | Technician |
+| 50 | GET | `/api/verifications/:id` | Verification | Owner or Admin |
+| 51 | PATCH | `/api/verifications/:id` | Verification | Admin |
+| **CATEGORY** ||||| 
+| 52 | GET | `/api/categories` | Category | Public |
+| 53 | POST | `/api/categories` | Category | Admin |
+| 54 | PUT | `/api/categories/:id` | Category | Admin |
+| 55 | DELETE | `/api/categories/:id` | Category | Admin |
+| 56 | PATCH | `/api/categories/:id/status` | Category | Admin |
+| **ADMIN** ||||| 
+| 57 | GET | `/api/admin/stats` | Admin Dashboard | Admin |
+| 58 | GET | `/api/admin/stats/revenue` | Admin Dashboard | Admin |
+| 59 | GET | `/api/admin/stats/service-distribution` | Admin Dashboard | Admin |
+| 60 | GET | `/api/admin/orders/recent` | Admin Dashboard | Admin |
+| 61 | GET | `/api/admin/transactions` | Admin Finance | Admin |
+| 62 | GET | `/api/admin/withdraw-requests` | Admin Finance | Admin |
+| 63 | POST | `/api/admin/withdraw-requests/:id/approve` | Admin Finance | Admin |
+| 64 | PATCH | `/api/admin/commission` | Admin Finance | Admin |
+| 65 | POST | `/api/admin/wallet/adjust` | Admin Finance | Admin |
+| 66 | GET | `/api/admin/settings` | Admin Settings | Admin |
+| 67 | PUT | `/api/admin/settings` | Admin Settings | Admin |
+| **FILE UPLOAD** ||||| 
+| 68 | POST | `/api/upload/image` | Upload | Authenticated |
+| 69 | POST | `/api/upload/images` | Upload | Authenticated |
+| **NOTIFICATION** ||||| 
+| 70 | GET | `/api/notifications` | Notification | Authenticated |
+| 71 | PATCH | `/api/notifications/:id/read` | Notification | Authenticated |
+| 72 | PATCH | `/api/notifications/read-all` | Notification | Authenticated |
 
-```json
-{
-  "success": true,
-  "data": {}
-}
+**Tổng: 72 REST endpoints + 7 WebSocket events.**
+
+---
+
+## 3. AUTH
+
+### 3.1 POST `/api/auth/login`
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identifier": "0901234567",
+    "password": "Abc@1234",
+    "role": "customer"
+  }'
 ```
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Dữ liệu không hợp lệ",
-    "fields": {
-      "amount": "Số tiền nạp tối thiểu là 10,000"
-    }
-  }
-}
-```
-
-### 2.2 `PagedResponse<T>`
-
+**200 OK**
 ```json
 {
   "success": true,
   "data": {
-    "items": [],
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 0,
-      "totalPages": 0
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "user": {
+      "id": "USR-001",
+      "fullName": "Trần Thị Lan",
+      "email": "lan@email.com",
+      "phone": "0901234567",
+      "role": "customer",
+      "avatar": "https://...",
+      "status": "verified"
     }
   }
 }
 ```
 
----
+**401** `INVALID_CREDENTIALS` — email/phone hoặc password sai.
 
-## 3. Quy ước chung
-
-### 3.1 Header
-
-- `Content-Type: application/json`
-- `Authorization: Bearer <access_token>` cho các API bảo vệ
-
-### 3.2 Phân trang
-
-- `page` là **1-based**
-- `limit` mặc định là `10`
-- `page`/`limit` được backend làm tròn về giá trị an toàn nếu cần
-
-### 3.3 Currency
-
-- Hệ thống dùng **VND**
-- Tiền tệ lưu bằng `BigDecimal`
-- Không dùng số thập phân cho số tiền
-
----
-
-## 4. Auth API
-
-**Base path**: `/api/auth`
-
-### 4.1 Đăng ký
-
-`POST /api/auth/register`
-
-**Request**
+### 3.2 POST `/api/auth/register`
 
 ```json
 {
@@ -109,908 +191,623 @@ Tài liệu tham chiếu chính thức cho các API `auth`, `user`, `wallet` và
 }
 ```
 
-**Ràng buộc**
+Trả `201` với cùng shape login, status mặc định `pending` (sẽ chuyển `verified` sau khi xác nhận email).
 
-- `fullName`: bắt buộc
-- `email`: bắt buộc, đúng định dạng
-- `phone`: bắt buộc, khớp regex `^(0|\+84)[3-9][0-9]{8}$`
-- `password`: tối thiểu 8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt
-- `role`: chỉ chấp nhận `CUSTOMER` hoặc `TECHNICIAN` (không cho đăng ký `ADMIN`)
+### 3.3 POST `/api/auth/forgot-password`
 
-**Response 201**
+```json
+{ "identifier": "0901234567" }
+```
+
+### 3.4 POST `/api/auth/change-password`
 
 ```json
 {
-  "success": true,
-  "data": {
-    "accessToken": "eyJ...",
-    "refreshToken": "eyJ...",
-    "user": {
-      "id": 1,
-      "code": "USR-0001",
-      "fullName": "Nguyễn Văn A",
-      "email": "vana@email.com",
-      "phone": "0901234567",
-      "role": "CUSTOMER",
-      "status": "PENDING",
-      "avatar": null,
-      "district": null,
-      "address": null,
-      "bio": null,
-      "createdAt": "2026-05-09T10:00:00",
-      "updatedAt": "2026-05-09T10:00:00"
-    }
-  }
+  "newPassword": "NewAbc@1234",
+  "confirmPassword": "NewAbc@1234",
+  "token": "reset-token-from-sms-or-email"
 }
 ```
 
-**Lưu ý**
+### 3.5 GET `/api/auth/me`
 
-- Tài khoản mới được tạo với trạng thái `PENDING`
-- Backend tự tạo ví cho user sau khi đăng ký thành công
+```bash
+curl http://localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+### 3.6 Other auth endpoints
+
+`POST /api/auth/refresh-token`, `POST /api/auth/logout`, `POST /api/auth/verify-email` — standard JWT refresh, logout revokes refresh token, verify-email kích hoạt account.
 
 ---
 
-### 4.2 Đăng nhập
+## 4. USER
 
-`POST /api/auth/login`
+### 4.1 GET `/api/users`
 
-**Request**
+```
+?role=technician&status=pending&district=Quận 1&keyword=Nguyễn&page=1&limit=10
+```
+
+### 4.2 PATCH `/api/users/:id`
+
+Update profile (fullName, phone, email, address). Self-only trừ admin.
+
+### 4.3 PATCH `/api/users/:id/status` (Admin)
 
 ```json
-{
-  "identifier": "vana@email.com",
-  "password": "Abc@1234",
-  "role": "customer"
-}
-```
-
-**Ghi chú**
-
-- `identifier` có thể là email hoặc số điện thoại
-- `role` là tùy chọn; nếu có thì phải khớp với role thực tế của user
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJ...",
-    "refreshToken": "eyJ...",
-    "user": {
-      "id": 1,
-      "code": "USR-0001",
-      "fullName": "Nguyễn Văn A",
-      "email": "vana@email.com",
-      "phone": "0901234567",
-      "role": "CUSTOMER",
-      "status": "ACTIVE"
-    }
-  }
-}
-```
-
-**Lưu ý**
-
-- Nếu user bị khóa, backend trả lỗi `ACCOUNT_LOCKED`
-- Nếu user bị vô hiệu hóa, backend trả lỗi `ACCOUNT_DISABLED`
-
----
-
-### 4.3 Refresh access token
-
-`POST /api/auth/refresh-token`
-
-**Request**
-
-```json
-{
-  "refreshToken": "eyJ..."
-}
-```
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJ..."
-  }
-}
-```
-
-**Lưu ý**
-
-- Refresh token phải hợp lệ về chữ ký và chưa hết hạn
-- Token trong DB cũng phải chưa bị revoke
-
----
-
-### 4.4 Đăng xuất
-
-`POST /api/auth/logout`
-
-**Headers**
-
-```http
-Authorization: Bearer <access_token>
-```
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": null
-}
-```
-
-**Lưu ý**
-
-- API sẽ revoke toàn bộ refresh token của user hiện tại
-- Nếu access token đã không hợp lệ, backend coi như đã logout xong
-
----
-
-### 4.5 Quên mật khẩu
-
-`POST /api/auth/forgot-password`
-
-**Request**
-
-```json
-{
-  "identifier": "vana@email.com"
-}
-```
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": null
-}
-```
-
-**Lưu ý**
-
-- Backend tạo password reset token mới và vô hiệu hóa token cũ
-- Hiện tại token được log ra, phần gửi email/SMS vẫn chưa triển khai
-
----
-
-### 4.6 Đổi mật khẩu
-
-`POST /api/auth/change-password`
-
-**Request**
-
-```json
-{
-  "newPassword": "NewPass@123",
-  "confirmPassword": "NewPass@123",
-  "token": "reset-token-from-email-or-log"
-}
-```
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": null
-}
-```
-
-**Lưu ý**
-
-- `newPassword` và `confirmPassword` phải trùng nhau
-- Token reset phải còn hiệu lực và chưa sử dụng
-- Sau khi đổi mật khẩu, toàn bộ refresh token cũ sẽ bị revoke
-
----
-
-### 4.7 Lấy thông tin user hiện tại
-
-`GET /api/auth/me`
-
-**Headers**
-
-```http
-Authorization: Bearer <access_token>
-```
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "code": "USR-0001",
-    "fullName": "Nguyễn Văn A",
-    "email": "vana@email.com",
-    "phone": "0901234567",
-    "role": "CUSTOMER",
-    "status": "ACTIVE"
-  }
-}
+{ "status": "locked", "reason": "Vi phạm điều khoản sử dụng" }
 ```
 
 ---
 
-## 5. User API
+## 5. TECHNICIAN
 
-**Base path**: `/api/users`
+### 5.1 GET `/api/technicians`
 
-> Hiện tại các endpoint dưới đây chỉ cần xác thực, chưa có ràng buộc role ngoài `PATCH /{id}/status`.
+Public marketplace listing với filter:
+```
+?service=Máy lạnh&district=Quận 1&minRating=4&isAvailable=true&page=1&limit=10
+```
 
-### 5.1 Danh sách user
+`rating`, `reviewCount`, `completedJobs` được tính realtime từ Review/Order.
 
-`GET /api/users?role=&status=&district=&keyword=&page=1&limit=10`
+### 5.2 GET `/api/technicians/:id`
 
-**Query params**
+Full profile gồm `bio`, `skills[]`, `coverImage`, `verificationStatus`, `schedule: { monday, tuesday, ... }`.
 
-| Param | Kiểu | Mặc định | Mô tả |
-|---|---|---:|---|
-| `role` | string | null | Lọc theo role |
-| `status` | string | null | Lọc theo status |
-| `district` | string | null | Lọc theo quận/huyện |
-| `keyword` | string | null | Tìm theo từ khóa |
-| `page` | int | 1 | Trang hiện tại |
-| `limit` | int | 10 | Số bản ghi/trang |
+### 5.3 PATCH `/api/technicians/:id/profile`
 
-**Response 200**
+Self hoặc admin. PATCH semantics — chỉ field non-null mới apply.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": 1,
-        "code": "USR-0001",
-        "fullName": "Nguyễn Văn A",
-        "email": "vana@email.com",
-        "phone": "0901234567",
-        "role": "CUSTOMER",
-        "status": "ACTIVE",
-        "district": "Quận 1",
-        "address": "123 ABC",
-        "bio": null,
-        "createdAt": "2026-05-09T10:00:00",
-        "updatedAt": "2026-05-09T10:00:00"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 1,
-      "totalPages": 1
-    }
-  }
+  "fullName": "Nguyễn Văn Minh",
+  "phone": "098 765 4321",
+  "bio": "Kỹ thuật viên hơn 10 năm kinh nghiệm...",
+  "skills": ["Máy lạnh", "Máy giặt", "Tủ lạnh"],
+  "areas": ["Quận Bình Thạnh", "Quận 1", "Quận 3"]
 }
 ```
 
-**Ghi chú**
+### 5.4 PATCH `/api/technicians/:id/availability`
 
-- Sắp xếp theo `createdAt DESC`
-- Trang API là 1-based
+```json
+{ "isAvailable": true }
+```
+
+### 5.5 GET `/api/technicians/:id/reviews`
+
+```
+?page=1&limit=5
+```
+Trả `averageRating`, `totalReviews`, paged `items[]`.
 
 ---
 
-### 5.2 Chi tiết user theo id
+## 6. ORDER (module core)
 
-`GET /api/users/{id}`
+### 6.1 POST `/api/orders` (Customer)
 
-**Path params**
+```bash
+curl -X POST http://localhost:8080/api/orders \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "deviceName": "Máy giặt cửa ngang LG",
+    "description": "Máy giặt nhà tôi dạo này chạy không vắt được...",
+    "address": "Quận 7, HCMC",
+    "estimatedPrice": 450000,
+    "expectedTime": "2026-05-08T14:00:00.000Z",
+    "serviceCategory": "Máy giặt",
+    "images": ["https://...image1.jpg"]
+  }'
+```
+→ `201` với order code `GU-99300`, status `new`.
 
-| Param | Kiểu | Mô tả |
-|---|---|---|
-| `id` | long | ID nội bộ của user |
+### 6.2 GET `/api/orders`
 
-**Response 200**
+```
+?status=scheduled&page=1&limit=10
+```
+
+- Customer thấy chỉ đơn của mình
+- Technician thấy đơn được assign
+- Admin thấy tất cả
+
+### 6.3 GET `/api/orders/:id`
+
+Detail có thêm `priceAdjustment` (nếu có), `images[]`, `review` (sau khi có).
+
+### 6.4 PATCH `/api/orders/:id/status` (Technician)
+
+Chỉ chấp nhận `SCHEDULED → IN_PROGRESS → COMPLETED`.
+```json
+{ "status": "in-progress" }
+```
+
+### 6.5 POST `/api/orders/:id/cancel`
+
+```json
+{ "reason": "Tôi tìm được người quen sửa giúp rồi" }
+```
+
+### 6.6 POST `/api/orders/:id/accept` (Technician)
+
+Không body. Yêu cầu order ở status `new`. Conflict 409 `ORDER_ALREADY_TAKEN` nếu đã có người nhận.
+
+### 6.7 POST `/api/orders/:id/reject` (Technician)
+
+```json
+{ "reason": "Tôi đang kẹt xe ở quận khác không về kịp" }
+```
+→ Đơn trả về pool, status `new`.
+
+### 6.8 POST `/api/orders/:id/complete` (Technician)
 
 ```json
 {
-  "success": true,
-  "data": {
-    "id": 1,
-    "code": "USR-0001",
-    "fullName": "Nguyễn Văn A",
-    "email": "vana@email.com",
-    "phone": "0901234567",
-    "role": "CUSTOMER",
-    "status": "ACTIVE"
-  }
+  "finalPrice": 600000,
+  "images": ["https://...completion1.jpg"]
 }
 ```
 
----
-
-### 5.3 Cập nhật profile user
-
-`PATCH /api/users/{id}`
-
-**Request**
+### 6.9 PATCH `/api/orders/:id/price` (Technician)
 
 ```json
 {
-  "fullName": "Nguyễn Văn A",
-  "email": "vana.new@email.com",
-  "phone": "0901234567",
-  "address": "123 ABC",
-  "district": "Quận 1",
-  "bio": "Khách hàng thân thiết",
-  "avatar": "https://example.com/avatar.png"
+  "newPrice": 600000,
+  "reason": "Phát sinh thay tụ điện do cháy nổ linh kiện cũ",
+  "parts": [
+    { "name": "Thay tụ quạt dàn lạnh", "price": 150000, "partCode": "CAP-D822" }
+  ],
+  "evidenceImages": ["https://...evidence1.jpg"]
 }
 ```
 
-**Lưu ý**
+### 6.10 POST `/api/orders/:id/price/approve` (Customer)
 
-- Tất cả field đều là optional
-- Nếu đổi `email` hoặc `phone`, backend sẽ kiểm tra trùng lặp
-- Giá trị rỗng sẽ bị bỏ qua
+Không body. Update `order.finalPrice` = `newPrice` của adjustment đang pending.
 
-**Response 200**
+### 6.11 POST `/api/orders/:id/price/reject` (Customer)
 
 ```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "code": "USR-0001",
-    "fullName": "Nguyễn Văn A",
-    "email": "vana.new@email.com",
-    "phone": "0901234567",
-    "role": "CUSTOMER",
-    "status": "ACTIVE"
-  }
-}
-```
-
----
-
-### 5.4 Cập nhật trạng thái user
-
-`PATCH /api/users/{id}/status`
-
-**Quyền**: `ADMIN`
-
-**Request**
-
-```json
-{
-  "status": "LOCKED",
-  "reason": "Vi phạm chính sách"
-}
-```
-
-**Lưu ý**
-
-- Trạng thái hợp lệ: `PENDING`, `ACTIVE`, `LOCKED`, `INACTIVE`
-- `reason` chỉ phục vụ log nghiệp vụ, không bắt buộc
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "code": "USR-0001",
-    "status": "LOCKED"
-  }
-}
+{ "reason": "Chi phí phát sinh quá cao so với ban đầu" }
 ```
 
 ---
 
-## 6. Wallet API
+## 7. REVIEW
 
-**Base path**: `/api/wallet`
-
-**Yêu cầu xác thực**: Bearer token
-
-### 6.1 Lấy ví hiện tại
-
-`GET /api/wallet`
-
-**Response 200**
+### 7.1 POST `/api/orders/:id/reviews` (Customer, after COMPLETED)
 
 ```json
 {
-  "success": true,
-  "data": {
-    "userId": "1",
-    "balance": 1500000,
-    "pendingBalance": 0,
-    "totalEarned": 1500000,
-    "totalWithdrawn": 0,
-    "currency": "VND",
-    "updatedAt": "2026-05-09T10:30:00"
-  }
+  "rating": 5,
+  "content": "Anh Hùng làm việc rất kỹ, giải thích rõ ràng",
+  "attachedImages": ["https://...review1.jpg"]
 }
 ```
-
-**Lưu ý**
-
-- Ví sẽ được tự tạo nếu chưa tồn tại
+→ `201`, code `REV-001`. Constraint: 1 review/order.
 
 ---
 
-### 6.2 Lịch sử giao dịch
+## 8. WARRANTY
 
-`GET /api/wallet/transactions?type=all&page=1&limit=10`
-
-**Query params**
-
-| Param | Kiểu | Mặc định | Mô tả |
-|---|---|---:|---|
-| `type` | string | `all` | `all`, `topup`, `withdraw`, `commission`, `payment`, `refund` |
-| `page` | int | 1 | Trang |
-| `limit` | int | 10 | Số bản ghi/trang |
-
-**Response 200**
+### 8.1 POST `/api/orders/:id/warranty` (Customer, after COMPLETED)
 
 ```json
 {
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": "TX-TOPUP-20260509-001",
-        "type": "topup",
-        "title": "Nạp tiền vào ví",
-        "category": "TÀI CHÍNH/NẠP TIỀN",
-        "amount": 500000,
-        "status": "success",
-        "createdAt": "2026-05-09T10:25:00"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 1,
-      "totalPages": 1
-    }
-  }
+  "description": "Máy lạnh rỉ nước lại chỗ cũ sau 2 tuần sửa",
+  "images": ["https://...warranty1.jpg"],
+  "scheduledAt": "2026-05-10T09:00:00.000Z"
 }
 ```
 
-**Lưu ý**
+### 8.2 GET `/api/orders/:id/warranty`
 
-- `type` không hợp lệ sẽ trả lỗi `INVALID_TRANSACTION_TYPE`
-- Danh sách chỉ bao gồm giao dịch của user hiện tại
+Trả về claim mới nhất, kèm `warrantyExpiresAt = completedAt + warrantyMonths (default 3)` và `remainingDays`.
 
 ---
 
-### 6.3 Tạo giao dịch nạp tiền
+## 9. REPORT
 
-`POST /api/wallet/topup`
+### 9.1 POST `/api/orders/:id/reports` (Participant)
 
-**Request**
-
-```json
-{
-  "amount": 500000,
-  "method": "vnpay"
-}
-```
-
-**Validation**
-
-- `amount` >= `10000`
-- `amount` là số nguyên
-- `method` hiện tại chỉ chấp nhận `vnpay`
-
-**Response 201**
+`reason` enum: `extra_fee | bad_attitude | no_show | poor_quality | fraud | other`.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "transactionId": "TX-TOPUP-20260509-001",
-    "amount": 500000,
-    "method": "vnpay",
-    "checkoutUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
-    "deepLink": null,
-    "qrCodeUrl": null,
-    "paymentInfo": null,
-    "expiredAt": "2026-05-09T10:55:00",
-    "status": "awaiting_payment"
-  }
+  "reason": "extra_fee",
+  "description": "Thợ yêu cầu thu thêm phụ phí ngoài hệ thống 200k",
+  "evidenceImages": ["https://...evidence1.jpg"]
 }
 ```
 
-**Lưu ý quan trọng**
+### 9.2 GET `/api/reports` (Admin)
 
-- Code hiện tại chỉ triển khai public flow qua **VNPay**
-- `WalletTopUpResponse` có các field `deepLink`/`qrCodeUrl`, nhưng backend hiện không trả về dữ liệu MoMo
-- Giao dịch top-up được tạo với trạng thái `awaiting_payment`
+```
+?status=open&keyword=GU-9921&page=1&limit=10
+```
 
 ---
 
-### 6.4 Xác nhận nạp tiền thủ công
+## 10. CHAT
 
-`POST /api/wallet/topup/confirm`
+### 10.1 GET `/api/conversations`
 
-**Request**
+Trả về conversations của user hiện tại với `partner` (đối tác), `lastMessage`, `unreadCount`.
 
-```json
-{
-  "transactionId": "TX-TOPUP-20260509-001"
-}
-```
-
-**Response 200**
+### 10.2 POST `/api/conversations` (Customer)
 
 ```json
-{
-  "success": true,
-  "data": {
-    "transactionId": "TX-TOPUP-20260509-001",
-    "status": "pending_verification",
-    "message": "Yêu cầu đang được xác minh"
-  }
-}
+{ "technicianId": "TECH-001", "orderId": "GU-99300" }
 ```
+→ Tạo `CONV-002` (hoặc reuse nếu đã có conv giữa cùng cặp customer-technician).
 
-**Lưu ý**
+### 10.3 GET `/api/conversations/:id/messages`
 
-- Endpoint này chỉ hợp lệ với giao dịch có `paymentMethod = vietqr`
-- Với code hiện tại, API public top-up không tạo VietQR transaction, nên endpoint này chủ yếu dành cho luồng nội bộ/tương lai
-- Nếu transaction không phải VietQR, backend trả lỗi
+`?page=1&limit=20`. **Side effect:** tự động update `lastReadAt` của caller — mark-as-read on view.
+
+### 10.4 POST `/api/conversations/:id/messages`
+
+```json
+{ "type": "text", "content": "Ok anh." }
+```
+Type chấp nhận: `text`, `image`. Quote messages **không** tạo qua endpoint này — dùng `/quotes`.
 
 ---
 
-### 6.5 Rút tiền
+## 11. QUOTATION
 
-`POST /api/wallet/withdraw`
-
-**Request**
+### 11.1 POST `/api/conversations/:id/quotes` (Technician)
 
 ```json
 {
-  "amount": 1000000,
-  "bankAccountId": "BANK-001"
+  "serviceName": "Sửa máy lạnh",
+  "description": "Vệ sinh + nạp gas R32",
+  "price": 450000,
+  "scheduledAt": "2026-05-08T14:00:00.000Z",
+  "notes": "Bao gồm vật tư"
 }
 ```
+→ Tạo Quotation + tự động đăng message type=`quotation` vào thread.
 
-**Validation**
+### 11.2 PATCH `/api/quotes/:id/accept` (Customer)
 
-- `amount` >= `50000`
-- `amount` phải lớn hơn phí rút
-- Số dư ví phải đủ
-- `bankAccountId` phải thuộc sở hữu của user hiện tại
-
-**Response 201**
-
-```json
-{
-  "success": true,
-  "data": {
-    "transactionId": "TX-WITHDRAW-20260509-001",
-    "amount": 1000000,
-    "fee": 5000,
-    "netAmount": 995000,
-    "bankAccount": {
-      "bankName": "MB Bank",
-      "accountNumber": "190332 **** 123",
-      "owner": "NGUYEN VAN A"
-    },
-    "status": "pending"
-  }
-}
-```
-
-**Lưu ý**
-
-- Backend khóa ví bằng `PESSIMISTIC_WRITE` khi rút tiền
-- `balance` bị trừ ngay, `pendingBalance` tăng theo `netAmount`
-- Trạng thái ban đầu của giao dịch là `pending`
+Không body. Side effects:
+- Quote → `accepted`
+- **Tạo Order mới với status `scheduled`** linking customer↔technician + service info từ quote
+- Response chứa `orderId`
 
 ---
 
-### 6.6 Danh sách tài khoản ngân hàng
+## 12. WALLET
 
-`GET /api/wallet/bank-accounts`
+### 12.1 GET `/api/wallet`
 
-**Response 200**
+Số dư hiện tại + tổng đã kiếm/đã rút.
 
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": "BANK-001",
-        "bankName": "MB Bank",
-        "accountNumber": "190332 **** 123",
-        "accountOwner": "NGUYEN VAN A",
-        "isDefault": true,
-        "createdAt": "2026-05-09T09:00:00"
-      }
-    ]
-  }
-}
-```
+### 12.2 GET `/api/wallet/transactions`
 
-**Lưu ý**
+`?type=all&page=1&limit=10` — `type` ∈ `topup | withdraw | commission | earning | refund | adjustment`.
 
-- Số tài khoản được mask trong response
-- Danh sách chỉ gồm tài khoản của user hiện tại
-
----
-
-### 6.7 Tạo tài khoản ngân hàng
-
-`POST /api/wallet/bank-accounts`
-
-**Request**
+### 12.3 POST `/api/wallet/topup`
 
 ```json
-{
-  "bankName": "MB Bank",
-  "accountNumber": "190332884123",
-  "accountOwner": "NGUYEN VAN A"
-}
+{ "amount": 500000, "method": "vietqr" }
+```
+→ Trả về QR code + thông tin chuyển khoản. Method khác: `vnpay` (redirect URL).
+
+### 12.4 POST `/api/wallet/topup/confirm`
+
+Sau khi user chuyển tiền:
+```json
+{ "transactionId": "TX-TOPUP-001" }
 ```
 
-**Validation**
-
-- `bankName`: bắt buộc
-- `accountNumber`: 6–20 chữ số
-- `accountOwner`: bắt buộc, phải viết hoa theo regex hiện tại
-
-**Response 201**
+### 12.5 POST `/api/wallet/withdraw`
 
 ```json
-{
-  "success": true,
-  "data": {
-    "id": "BANK-002",
-    "bankName": "MB Bank",
-    "accountNumber": "190332 **** 123",
-    "accountOwner": "NGUYEN VAN A",
-    "isDefault": false,
-    "createdAt": "2026-05-09T09:10:00"
-  }
-}
+{ "amount": 1000000, "bankAccountId": "BANK-001" }
 ```
+Trả về `transactionId`, `fee`, `netAmount`, `status: pending`.
 
-**Lưu ý**
+### 12.6 Bank accounts
 
-- Nếu là tài khoản đầu tiên thì `isDefault = true`
-- Trùng số tài khoản của cùng user sẽ trả lỗi `BANK_ACCOUNT_ALREADY_EXISTS`
-
----
-
-### 6.8 Xóa tài khoản ngân hàng
-
-`DELETE /api/wallet/bank-accounts/{id}`
-
-**Path params**
-
-| Param | Kiểu | Mô tả |
-|---|---|---|
-| `id` | string | Mã tài khoản ngân hàng, ví dụ `BANK-001` |
-
-**Response 200**
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Xóa tài khoản ngân hàng thành công"
-  }
-}
-```
-
-**Lưu ý**
-
-- `id` ở đây là **code** của bank account, không phải numeric id nội bộ
-- Không thể xóa tài khoản mặc định nếu user còn tài khoản khác
-
----
-
-## 7. Payment API
-
-**Base path**: `/api/payments`
-
-### 7.1 VNPay IPN
-
-`GET /api/payments/vnpay/ipn`
-
-Đây là webhook public từ VNPay.
-
-**Query params chính**
-
-| Param | Mô tả |
+| Method | Path |
 |---|---|
-| `vnp_TxnRef` | Mã giao dịch nội bộ |
-| `vnp_Amount` | Số tiền VNPay gửi về, tính theo đơn vị nhỏ hơn 100 lần |
-| `vnp_ResponseCode` | Mã phản hồi |
-| `vnp_TransactionStatus` | Trạng thái giao dịch |
-| `vnp_TransactionNo` | Mã giao dịch từ VNPay |
-| `vnp_SecureHash` | Chữ ký HMAC-SHA512 |
+| GET | `/api/wallet/bank-accounts` |
+| POST | `/api/wallet/bank-accounts` — body: `{ bankName, accountNumber, accountOwner }` |
+| DELETE | `/api/wallet/bank-accounts/:id` |
 
-**Response thành công**
+---
+
+## 13. VERIFICATION (KYC)
+
+### 13.1 POST `/api/verifications` (Technician, multipart)
+
+```bash
+curl -X POST http://localhost:8080/api/verifications \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "district=Quận 7, HCMC" \
+  -F "serviceCategory=Điện lạnh" \
+  -F "yearsExperience=5" \
+  -F "idFront=@/path/id-front.jpg" \
+  -F "idBack=@/path/id-back.jpg" \
+  -F "portrait=@/path/portrait.jpg" \
+  -F "certificate=@/path/cert.pdf"
+```
+
+Chặn nếu đang có submission pending cho cùng technician (409 `VERIFICATION_PENDING_EXISTS`).
+
+### 13.2 GET `/api/verifications` (Admin)
+
+`?status=pending&keyword=Nguyễn&page=1&limit=10`
+
+### 13.3 GET `/api/verifications/:id`
+
+Owner hoặc admin.
+
+### 13.4 PATCH `/api/verifications/:id` (Admin)
 
 ```json
 {
-  "RspCode": "00",
-  "Message": "Confirm Success"
+  "status": "approved",
+  "note": "Hồ sơ đầy đủ, thông tin trùng khớp.",
+  "reviewedBy": "Admin AD-9902",
+  "notifyTechnician": true
 }
 ```
 
-**Các mã phản hồi phổ biến**
+Side effect: cập nhật `technicianProfile.verificationStatus`.
 
-| RspCode | Ý nghĩa |
+---
+
+## 14. CATEGORY
+
+GET public, mọi endpoint khác Admin-only. Body multipart cho POST/PUT (vì có icon upload).
+
+```bash
+curl -X POST http://localhost:8080/api/categories \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "title=Máy lạnh" \
+  -F "description=Vệ sinh, bơm gas, sửa chữa board mạch" \
+  -F "priority=high" \
+  -F "status=active" \
+  -F "icon=@/path/icon.svg"
+```
+
+---
+
+## 15. ADMIN
+
+### 15.1 Dashboard
+
+| Path | Description |
 |---|---|
-| `00` | Hợp lệ và đã xử lý thành công |
-| `01` | Không tìm thấy transaction |
-| `02` | Callback đã được xử lý trước đó |
-| `04` | Số tiền không khớp |
-| `97` | Sai chữ ký |
+| `GET /api/admin/stats` | Total revenue / profit / active technicians / orders today |
+| `GET /api/admin/stats/revenue?range=7days` | Revenue chart data |
+| `GET /api/admin/stats/service-distribution` | Pie chart data |
+| `GET /api/admin/orders/recent?limit=5` | Latest orders |
 
-**Lưu ý**
+### 15.2 Finance
 
-- Backend tự verify chữ ký trước khi ghi nhận
-- Callback xử lý idempotent để tránh cộng ví 2 lần
-- Nếu thanh toán thành công, ví sẽ được cộng tiền và transaction chuyển sang `success`
-- Nếu thất bại, transaction chuyển sang `failed`
+```bash
+# Approve withdraw
+curl -X POST http://localhost:8080/api/admin/withdraw-requests/WR-001/approve \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 
----
+# Update commission/VAT
+curl -X PATCH http://localhost:8080/api/admin/commission \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{ "platformFeePercent": 15, "vatPercent": 10 }'
 
-## 8. Danh sách giá trị enum
-
-### 8.1 `Role`
-
-- `CUSTOMER`
-- `TECHNICIAN`
-- `ADMIN`
-
-### 8.2 `UserStatus`
-
-- `PENDING`
-- `ACTIVE`
-- `LOCKED`
-- `INACTIVE`
-
-### 8.3 `PaymentMethod`
-
-- `vietqr`
-- `vnpay`
-- `momo`
-- `bank_transfer`
-
-> Chú ý: enum có đủ giá trị, nhưng public flow hiện tại chỉ dùng `vnpay`.
-
-### 8.4 `TransactionType`
-
-- `topup`
-- `withdraw`
-- `commission`
-- `payment`
-- `refund`
-
-### 8.5 `TransactionStatus`
-
-- `pending`
-- `success`
-- `failed`
-- `cancelled`
-- `awaiting_payment`
-- `pending_verification`
-
----
-
-## 9. Cấu hình môi trường
-
-Từ `src/main/resources/application.yml`:
-
-```yaml
-spring:
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-
-jwt:
-  secret: <base64-secret>
-  access-token-expiration: 900000
-  refresh-token-expiration: 604800000
-  password-reset-expiration: 3600000
-
-app:
-  wallet:
-    default-currency: VND
-    topup-min-amount: 10000
-    withdraw-min-amount: 50000
-    withdraw-fee: 5000
-    topup-expiry-minutes: 30
-  payment:
-    vnpay:
-      tmn-code: ${VNPAY_TMN_CODE:}
-      secret-key: ${VNPAY_SECRET_KEY:}
-      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      return-url: ${VNPAY_RETURN_URL:http://localhost:3000/wallet/topup-result}
-      ip-address: ${VNPAY_IP_ADDRESS:127.0.0.1}
+# Adjust technician wallet
+curl -X POST http://localhost:8080/api/admin/wallet/adjust \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "technicianId": "TECH-001",
+    "amount": -50000,
+    "type": "commission-minus",
+    "reason": "Điều chỉnh hoa hồng đơn GU-99210"
+  }'
 ```
 
-### Biến môi trường cần thiết
+### 15.3 Settings
 
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `MAIL_USERNAME`
-- `MAIL_PASSWORD`
-- `VNPAY_TMN_CODE`
-- `VNPAY_SECRET_KEY`
-- `VNPAY_PAY_URL` nếu muốn dùng production endpoint
-- `VNPAY_RETURN_URL`
-- `VNPAY_IP_ADDRESS`
+`GET` / `PUT /api/admin/settings` quản lý `general`, `billing`, `notifications`, `operations` blocks.
 
 ---
 
-## 10. Lỗi thường gặp
+## 16. FILE UPLOAD
 
-### Validation error
+```bash
+curl -X POST http://localhost:8080/api/upload/image \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/photo.jpg" \
+  -F "folder=avatars"
+```
+
+`folder` ∈ `avatars | orders | verifications | categories`. Multi-upload tương tự `/api/upload/images` (key `files`).
+
+---
+
+## 17. NOTIFICATIONS
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/notifications` | Inbox + `unreadCount` |
+| PATCH | `/api/notifications/:id/read` | Mark single as read |
+| PATCH | `/api/notifications/read-all` | Mark all as read |
+
+Notifications được **tự động tạo** khi:
+- Technician nhận đơn → notify customer (`order_accepted`)
+- Technician hoàn thành → notify customer (`order_completed`)
+- Technician đề nghị tăng giá → notify customer (`price_adjustment`)
+- Customer accept quote → notify technician (`order_accepted`)
+
+Mỗi notification persistence DB **đồng thời** phát WebSocket event (mục 18).
+
+---
+
+## 18. WebSocket events
+
+### 18.1 Kết nối
+
+```js
+import SockJS from 'sockjs-client'
+import { Client } from '@stomp/stompjs'
+
+const client = new Client({
+  webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+  connectHeaders: { Authorization: `Bearer ${accessToken}` },
+  onConnect: () => { /* subscribe... */ }
+})
+client.activate()
+```
+
+JWT phải gửi qua STOMP `Authorization` header trên CONNECT frame.
+
+### 18.2 Subscribe destinations
+
+| Destination | Events nhận |
+|---|---|
+| `/topic/conversations.{convCode}` | `message:new`, `typing`, `stop_typing` |
+| `/topic/orders.{orderCode}` | `order:status_changed`, `price:adjustment_requested` |
+| `/topic/notifications.{userCode}` | `notification:new` |
+
+### 18.3 Payload shapes
 
 ```json
+// message:new — push to /topic/conversations.CONV-001
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Dữ liệu không hợp lệ",
-    "fields": {
-      "amount": "Số tiền nạp tối thiểu là 10,000"
-    }
+  "event": "message:new",
+  "conversationId": "CONV-001",
+  "message": {
+    "id": "MSG-010",
+    "senderId": "TECH-001",
+    "type": "text",
+    "content": "Tôi đang trên đường đến",
+    "sentAt": "2026-05-07T13:55:00.000Z",
+    "isRead": false
   }
+}
+
+// order:status_changed
+{
+  "event": "order:status_changed",
+  "orderId": "GU-99210",
+  "oldStatus": "scheduled",
+  "newStatus": "in-progress",
+  "updatedAt": "2026-05-07T14:05:00.000Z"
+}
+
+// price:adjustment_requested
+{
+  "event": "price:adjustment_requested",
+  "orderId": "GU-99210",
+  "originalPrice": 450000,
+  "newPrice": 600000,
+  "reason": "Phát sinh thay tụ điện"
+}
+
+// notification:new
+{
+  "event": "notification:new",
+  "id": "NOTIF-003",
+  "type": "order_completed",
+  "title": "Đơn hoàn thành",
+  "body": "Đơn GU-99210 đã hoàn thành",
+  "data": { "orderId": "GU-99210" }
 }
 ```
 
-### Not found
+### 18.4 Send (client → server)
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Không tìm thấy người dùng với id: 1"
-  }
-}
-```
+| Destination | Body | Effect |
+|---|---|---|
+| `/app/conversations/{id}/typing` | empty | Fan out `typing` event |
+| `/app/conversations/{id}/stop-typing` | empty | Fan out `stop_typing` |
 
-### Conflict
+`join_conversation` (theo PDF spec) thực hiện ngầm qua `SUBSCRIBE /topic/conversations.{id}`.
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "BANK_ACCOUNT_ALREADY_EXISTS",
-    "message": "Tài khoản ngân hàng đã tồn tại"
-  }
-}
-```
+### 18.5 Spec ↔ STOMP mapping
+
+| PDF Socket.IO syntax | STOMP equivalent |
+|---|---|
+| `socket.on("message:new", cb)` | `client.subscribe('/topic/conversations.{id}', cb)` rồi switch `payload.event` |
+| `socket.on("order:status_changed", cb)` | `client.subscribe('/topic/orders.{id}', cb)` |
+| `socket.emit("typing", {...})` | `client.publish({ destination: '/app/conversations/{id}/typing' })` |
+| `socket.emit("join_conversation", {...})` | Không cần — subscribe ngầm join |
 
 ---
 
-## 11. Kết luận nhanh
+## 19. Error codes
 
-- Auth, user, wallet đều đã có tài liệu hóa theo code hiện tại.
-- Public payment flow hiện tại là **VNPay**.
-- MoMo có DTO/enums trong code, nhưng chưa có endpoint public hoạt động.
+| Code | HTTP | Ý nghĩa |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | Chưa đăng nhập hoặc token hết hạn |
+| `FORBIDDEN` | 403 | Không đủ quyền |
+| `NOT_FOUND` | 404 | Tài nguyên không tồn tại |
+| `VALIDATION_ERROR` | 422 | Lỗi field validation, kèm `fields` map |
+| `INVALID_CREDENTIALS` | 401 | Sai email/phone hoặc password |
+| `INVALID_TOKEN` | 401 | Token signature sai hoặc revoked |
+| `TOKEN_EXPIRED` | 401 | Access/refresh token expired |
+| `EMAIL_ALREADY_EXISTS` | 409 | Email trùng |
+| `PHONE_ALREADY_EXISTS` | 409 | SĐT trùng |
+| `INSUFFICIENT_BALANCE` | 400 | Số dư không đủ để rút |
+| `ORDER_ALREADY_TAKEN` | 409 | Đơn đã có thợ nhận |
+| `INVALID_ORDER_STATUS_TRANSITION` | 400 | Chuyển trạng thái không hợp lệ |
+| `REVIEW_ALREADY_EXISTS` | 409 | Đơn đã có review |
+| `WARRANTY_EXPIRED` | 400 | Đã hết thời hạn bảo hành |
+| `VERIFICATION_PENDING_EXISTS` | 409 | Đang có submission pending |
+| `QUOTATION_NOT_PENDING` | 400 | Báo giá không còn pending để accept |
+| `INTERNAL_SERVER_ERROR` | 500 | Lỗi server |
 
 ---
 
-## 12. Tham chiếu liên quan
+## 20. Setup & run
 
-- `README.md`
-- `docs/WALLET_API.md`
-- `docs/PAYMENT_INTEGRATION.md`
+```bash
+# Prerequisites: Java 21, Maven 3.9+, PostgreSQL (hoặc dùng docker-compose.yml)
 
+# 1. Environment variables (.env hoặc shell)
+export DB_URL="jdbc:postgresql://localhost:5432/glowup"
+export DB_USERNAME="glowup"
+export DB_PASSWORD="..."
+export MAIL_USERNAME="..."   # Gmail app password
+export MAIL_PASSWORD="..."
+
+# 2. Build + run
+cd tmdt
+mvn clean package -DskipTests
+mvn spring-boot:run
+# Server listening on :8080
+# WebSocket endpoint: ws://localhost:8080/ws
+```
+
+Schema được Hibernate auto-create (`spring.jpa.hibernate.ddl-auto: update`) khi khởi động.
+Seed data demo nằm ở `src/main/resources/data.sql`.
+
+---
+
+## 21. Demo seed data
+
+File `src/main/resources/data.sql` seed sẵn:
+- 1 admin: `admin@glowup.vn` / `Admin@1234`
+- 2 customers: `lan@email.com`, `hoang@email.com` / `Customer@1234`
+- 2 technicians: `tuan@glowup.pro`, `minh@glowup.pro` / `Tech@1234`
+- 5 service categories
+- 1 sample completed order với review để test detail view
+
+Yêu cầu `spring.jpa.defer-datasource-initialization: true` trong `application.yml`.
+
+---
+
+## 22. Tham khảo thêm
+
+- **DB schema (DBML)**: `glowup_schema.dbml` (root repo)
+- **Postman collection**: `docs/postman_collection.json`
+- **Security review**: `docs/SECURITY_REVIEW.md`
+- **Email confirmation flow**: `docs/EMAIL_CONFIRMATION.md`
+- **VNPay integration**: `docs/PAYMENT_INTEGRATION.md`

@@ -66,4 +66,28 @@ public final class ErrorCode {
     public static final String INVALID_FILE_TYPE                = "INVALID_FILE_TYPE";
     public static final String INVALID_FILE_FOLDER              = "INVALID_FILE_FOLDER";
     public static final String FILE_UPLOAD_FAILED               = "FILE_UPLOAD_FAILED";
+
+    // Order
+    public static final String ORDER_NOT_FOUND                   = "ORDER_NOT_FOUND";
+    public static final String ORDER_ALREADY_TAKEN               = "ORDER_ALREADY_TAKEN";
+    public static final String INVALID_ORDER_STATUS_TRANSITION   = "INVALID_ORDER_STATUS_TRANSITION";
+    public static final String PRICE_ADJUSTMENT_NOT_FOUND        = "PRICE_ADJUSTMENT_NOT_FOUND";
+
+    // Review / Warranty / Report
+    public static final String REVIEW_ALREADY_EXISTS             = "REVIEW_ALREADY_EXISTS";
+    public static final String REVIEW_NOT_FOUND                  = "REVIEW_NOT_FOUND";
+    public static final String WARRANTY_EXPIRED                  = "WARRANTY_EXPIRED";
+    public static final String WARRANTY_NOT_FOUND                = "WARRANTY_NOT_FOUND";
+    public static final String REPORT_NOT_FOUND                  = "REPORT_NOT_FOUND";
+
+    // Technician / Verification
+    public static final String TECHNICIAN_NOT_FOUND              = "TECHNICIAN_NOT_FOUND";
+    public static final String VERIFICATION_NOT_FOUND            = "VERIFICATION_NOT_FOUND";
+    public static final String VERIFICATION_PENDING_EXISTS       = "VERIFICATION_PENDING_EXISTS";
+
+    // Chat / Quotation
+    public static final String CONVERSATION_NOT_FOUND            = "CONVERSATION_NOT_FOUND";
+    public static final String MESSAGE_NOT_FOUND                 = "MESSAGE_NOT_FOUND";
+    public static final String QUOTATION_NOT_FOUND               = "QUOTATION_NOT_FOUND";
+    public static final String QUOTATION_NOT_PENDING             = "QUOTATION_NOT_PENDING";
 }
