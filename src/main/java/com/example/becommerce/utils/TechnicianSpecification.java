@@ -31,7 +31,6 @@ public final class TechnicianSpecification {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // Restrict to non-deleted users; the join also enables district/keyword filters.
             var userJoin = root.join("user", JoinType.INNER);
             predicates.add(cb.isFalse(userJoin.get("deleted")));
 
@@ -41,11 +40,11 @@ public final class TechnicianSpecification {
 
             if (StringUtils.hasText(service)) {
                 String like = "%" + service.toLowerCase() + "%";
-                Predicate categoryMatch = cb.like(cb.lower(root.get("serviceCategory")), like);
+                Predicate categoryMatch = cb.like(cb.lower(root.get("serviceCategory").as(String.class)), like);
 
-                // Skills are an @ElementCollection; use a subquery to avoid duplicating rows.
                 var skillJoin = root.join("skills", JoinType.LEFT);
-                Predicate skillMatch = cb.like(cb.lower(skillJoin), like);
+                var skillExpr = skillJoin.as(String.class);
+                Predicate skillMatch = cb.like(cb.lower(skillExpr), like);
                 if (query != null) query.distinct(true);
 
                 predicates.add(cb.or(categoryMatch, skillMatch));
@@ -53,9 +52,10 @@ public final class TechnicianSpecification {
 
             if (StringUtils.hasText(district)) {
                 String like = "%" + district.toLowerCase() + "%";
-                Predicate userDistrict = cb.like(cb.lower(userJoin.get("district")), like);
+                Predicate userDistrict = cb.like(cb.lower(userJoin.get("district").as(String.class)), like);
                 var areaJoin = root.join("areas", JoinType.LEFT);
-                Predicate areaMatch = cb.like(cb.lower(areaJoin), like);
+                var areaExpr = areaJoin.as(String.class);
+                Predicate areaMatch = cb.like(cb.lower(areaExpr), like);
                 if (query != null) query.distinct(true);
 
                 predicates.add(cb.or(userDistrict, areaMatch));
@@ -63,8 +63,8 @@ public final class TechnicianSpecification {
 
             if (StringUtils.hasText(keyword)) {
                 String like = "%" + keyword.toLowerCase() + "%";
-                Predicate fullName = cb.like(cb.lower(userJoin.get("fullName")), like);
-                Predicate phone    = cb.like(userJoin.get("phone"), "%" + keyword + "%");
+                Predicate fullName = cb.like(cb.lower(userJoin.get("fullName").as(String.class)), like);
+                Predicate phone    = cb.like(userJoin.get("phone").as(String.class), "%" + keyword + "%");
                 predicates.add(cb.or(fullName, phone));
             }
 

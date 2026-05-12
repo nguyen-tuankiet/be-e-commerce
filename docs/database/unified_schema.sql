@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS orders (
   deleted_at       TIMESTAMPTZ,
   CONSTRAINT ck_orders_status CHECK (status IN ('new', 'assigned', 'scheduled', 'in_progress', 'completed', 'cancelled')),
   CONSTRAINT ck_orders_actor CHECK (cancelled_by IS NULL OR cancelled_by IN ('customer', 'technician', 'admin', 'system')),
-  CONSTRAINT ck_orders_payment_method CHECK (payment_method IS NULL OR payment_method IN ('VIETQR', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'wallet', 'cash', 'vietqr', 'momo', 'bank_transfer')),
+  CONSTRAINT ck_orders_payment_method CHECK (payment_method IS NULL OR payment_method IN ('VIETQR', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'WALLET', 'cash', 'vietqr', 'momo', 'bank_transfer')),
   CONSTRAINT ck_orders_money CHECK (estimated_price >= 0 AND (final_price IS NULL OR final_price >= 0)),
   CONSTRAINT ck_orders_warranty CHECK (warranty_months >= 0),
   CONSTRAINT ck_orders_lat CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
