@@ -390,3 +390,87 @@ WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.code = g.code);
 -- Verify: at least 30 orders from seed
 -- SELECT count(*) FROM orders WHERE code LIKE 'GU-SEED-%';
 
+-- ============================================================
+-- Seed 10 order_reports (đúng CHECK constraints)
+-- Sử dụng các order đã có: GU-SEED-001 ... GU-SEED-008
+-- ============================================================
+
+-- 1. BAD_ATTITUDE, RESOLVED (order 001)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-001', o.id, o.customer_id, o.technician_id, 'BAD_ATTITUDE',
+       'KTV đến trễ 30p, nói chuyện cộc lốc, không giải thích chi phí phát sinh.',
+       'RESOLVED', NOW() - INTERVAL '5 days', NOW() - INTERVAL '2 days'
+FROM orders o WHERE o.code = 'GU-SEED-001'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-001');
+
+-- 2. OTHER, INVESTIGATING (order 002)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-002', o.id, o.customer_id, o.technician_id, 'OTHER',
+       'KTV tự ý sửa thêm hạng mục không được yêu cầu, làm tăng thời gian và chi phí.',
+       'INVESTIGATING', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'
+FROM orders o WHERE o.code = 'GU-SEED-002'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-002');
+
+-- 3. NO_SHOW, OPEN (order 003)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-003', o.id, o.customer_id, o.technician_id, 'NO_SHOW',
+       'KTV không đến đúng giờ hẹn, không báo trước, tôi chờ 1 tiếng.',
+       'OPEN', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'
+FROM orders o WHERE o.code = 'GU-SEED-003'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-003');
+
+-- 4. FRAUD, DISMISSED (order 004)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-004', o.id, o.customer_id, o.technician_id, 'FRAUD',
+       'KTV báo chi phí thay thế linh kiện cao gấp 3 lần giá thị trường, có dấu hiệu gian lận.',
+       'DISMISSED', NOW() - INTERVAL '10 days', NOW() - INTERVAL '8 days'
+FROM orders o WHERE o.code = 'GU-SEED-004'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-004');
+
+-- 5. EXTRA_FEE, RESOLVED (order 005)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-005', o.id, o.customer_id, o.technician_id, 'EXTRA_FEE',
+       'Báo giá 500k, sau đó KTV đòi thêm 700k vì "dây cũ", tôi không đồng ý.',
+       'RESOLVED', NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days'
+FROM orders o WHERE o.code = 'GU-SEED-005'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-005');
+
+-- 6. POOR_QUALITY, INVESTIGATING (order 006)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-006', o.id, o.customer_id, o.technician_id, 'POOR_QUALITY',
+       'Sửa xong 2 ngày lại hỏng, KTV không bảo hành, đòi thu thêm tiền.',
+       'INVESTIGATING', NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'
+FROM orders o WHERE o.code = 'GU-SEED-006'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-006');
+
+-- 7. EXTRA_FEE, OPEN (order 007)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-007', o.id, o.customer_id, o.technician_id, 'EXTRA_FEE',
+       'KTV báo thêm phí vệ sinh nhưng đã bao gồm trong gói dịch vụ.',
+       'OPEN', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
+FROM orders o WHERE o.code = 'GU-SEED-007'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-007');
+
+-- 8. NO_SHOW, DISMISSED (order 008)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-008', o.id, o.customer_id, o.technician_id, 'NO_SHOW',
+       'KTV hẹn 9h sáng nhưng 11h mới đến, không báo trước.',
+       'DISMISSED', NOW() - INTERVAL '12 days', NOW() - INTERVAL '10 days'
+FROM orders o WHERE o.code = 'GU-SEED-008'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-008');
+
+-- 9. FRAUD, INVESTIGATING (order 001)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-009', o.id, o.customer_id, o.technician_id, 'FRAUD',
+       'KTV thay aptomat mới nhưng thực tế chỉ sửa lại cái cũ, có dấu hiệu lừa đảo.',
+       'INVESTIGATING', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day'
+FROM orders o WHERE o.code = 'GU-SEED-001'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-009');
+
+-- 10. POOR_QUALITY, RESOLVED (order 003)
+INSERT INTO order_reports (code, order_id, customer_id, technician_id, reason, description, status, created_at, updated_at)
+SELECT 'REP-010', o.id, o.customer_id, o.technician_id, 'POOR_QUALITY',
+       'Vệ sinh máy lạnh xong vẫn bốc mùi, KTV không xử lý triệt để.',
+       'RESOLVED', NOW() - INTERVAL '5 days', NOW() - INTERVAL '2 days'
+FROM orders o WHERE o.code = 'GU-SEED-003'
+                AND NOT EXISTS (SELECT 1 FROM order_reports WHERE code = 'REP-010');
