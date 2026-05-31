@@ -141,7 +141,7 @@ public CommissionSettingsResponse getCommissionSettings() {
 
 ---
 
-## 📋 API Endpoints Summary
+##  API Endpoints Summary
 
 ### Modified Endpoint
 ```
@@ -182,7 +182,7 @@ GET /api/admin/commission-settings
 
 ---
 
-## 🔍 Validation
+##  Validation
 
 ### Input Validation Annotations
 - `@NotNull`: Ensures required fields are present
@@ -196,7 +196,7 @@ GET /api/admin/commission-settings
 
 ---
 
-## 🔄 Backward Compatibility
+##  Backward Compatibility
 
 ### Breaking Changes
 1. **PATCH /api/admin/commission** request no longer accepts `autoLockEnabled`
@@ -217,7 +217,7 @@ GET /api/admin/commission-settings
 
 ---
 
-## 🧪 Testing Checklist
+##  Testing Checklist
 
 ### Unit Tests
 - [ ] Test valid commission update
@@ -243,7 +243,7 @@ GET /api/admin/commission-settings
 
 ---
 
-## 📚 Swagger Setup (Optional)
+##  Swagger Setup (Optional)
 
 To enable Swagger API documentation UI:
 
@@ -264,7 +264,7 @@ To enable Swagger API documentation UI:
 
 ---
 
-## 📝 Files Changed
+##  Files Changed
 
 ### Modified Files:
 1. `src/main/java/com/example/becommerce/dto/request/admin/CommissionUpdateRequest.java`
@@ -304,7 +304,7 @@ To enable Swagger API documentation UI:
 
 ---
 
-## 🎯 Next Steps
+##  Next Steps
 
 1. Review the changes in your IDE
 2. Run existing test suite to ensure no regressions
@@ -318,10 +318,9 @@ To enable Swagger API documentation UI:
 
 ---
 
-## 📞 Support
+##  Support
 
 For questions about this implementation:
 - Review `COMMISSION_API_REFACTOR.md` for detailed documentation
 - Check endpoint examples in `commission_api_postman_examples.json`
 - Review inline code comments in the modified files
-

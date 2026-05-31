@@ -36,6 +36,12 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     @Query("select coalesce(sum(t.netAmount), 0) from WalletTransaction t where t.status = :status")
     BigDecimal sumNetAmountByStatus(@Param("status") TransactionStatus status);
 
+    @Query("select coalesce(sum(t.amount), 0) from WalletTransaction t where t.wallet.id = :walletId and t.type = 'COMMISSION' and t.status = 'SUCCESS' and t.category = 'COMMISSION_DEDUCTION'")
+    BigDecimal sumCommissionDeductionAmount(@Param("walletId") Long walletId);
+
+    @Query("select max(coalesce(t.processedAt, t.createdAt)) from WalletTransaction t where t.wallet.id = :walletId and (t.order is not null or t.relatedOrderCode is not null)")
+    LocalDateTime findLastOrderActivityAt(@Param("walletId") Long walletId);
+
     @Query("select coalesce(sum(t.fee), 0) from WalletTransaction t where t.status = :status")
     BigDecimal sumFeeByStatus(@Param("status") TransactionStatus status);
 

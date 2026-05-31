@@ -27,7 +27,6 @@ import com.example.becommerce.entity.enums.PriceAdjustmentStatus;
 import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
-import com.example.becommerce.entity.enums.WalletStatus;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.OrderPriceAdjustmentRepository;
 import com.example.becommerce.repository.OrderRepository;
@@ -216,7 +215,7 @@ public class OrderServiceImpl implements OrderService {
         if (wallet == null) {
             throw AppException.badRequest(ErrorCode.BAD_REQUEST, "Không tìm thấy ví hoa hồng của kỹ thuật viên");
         }
-        if (WalletStatus.fromBalance(wallet.getBalance()) == WalletStatus.LOCKED) {
+        if (wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
             throw AppException.forbidden("Ví hoa hồng đang bị khóa do số dư thấp, không thể nhận đơn");
         }
         if (order.getStatus() != OrderStatus.NEW) {
@@ -404,14 +403,10 @@ public class OrderServiceImpl implements OrderService {
                 .orElseGet(() -> walletRepository.save(Wallet.builder()
                         .user(technician)
                         .currency("VND")
-                        .walletStatus(WalletStatus.NORMAL)
                         .build()));
 
         // Get fixed commission fee from system settings
         BigDecimal commissionFee = getFixedCommissionFee();
-        String commissionFeeStr = commissionFee.toPlainString();
-        String minimumBalanceStr = getMinimumCommissionBalance().toPlainString();
-        Boolean autoLockEnabled = getAutoLockEnabled();
 
         // Record revenue addition transaction
         BigDecimal balanceAfterRevenue = wallet.getBalance().add(finalPrice);
@@ -459,16 +454,6 @@ public class OrderServiceImpl implements OrderService {
 
         // Update wallet balance with commission deduction
         wallet.setBalance(balanceAfterDeduction.max(BigDecimal.ZERO));
-
-        // Recompute wallet status based on balance
-        WalletStatus newStatus = WalletStatus.fromBalance(wallet.getBalance());
-        wallet.setWalletStatus(newStatus);
-
-        // Auto-lock if enabled and balance < minimum
-        if (autoLockEnabled && wallet.getBalance().compareTo(getMinimumCommissionBalance()) < 0) {
-            wallet.setWalletStatus(WalletStatus.LOCKED);
-        }
-
         walletRepository.save(wallet);
     }
 
@@ -490,23 +475,12 @@ public class OrderServiceImpl implements OrderService {
                     try {
                         return new BigDecimal(s.getValue());
                     } catch (Exception ex) {
-                        return new BigDecimal("20000");
+                        return new BigDecimal("0");
                     }
                 })
-                .orElse(new BigDecimal("20000"));
+                .orElse(new BigDecimal("0"));
     }
 
-    private Boolean getAutoLockEnabled() {
-        return systemSettingRepository.findByKey("auto_lock_enabled")
-                .map(s -> Boolean.parseBoolean(s.getValue()))
-                .orElse(true);
-    }
-
-    // ===============================================================
-    // PRICE ADJUSTMENT — request, approve, reject
-    // ===============================================================
-
-    @Override
     @Transactional
     public PriceAdjustmentEnvelope requestPriceAdjustment(String code, PriceAdjustmentRequest request) {
         Order order = findOrder(code);

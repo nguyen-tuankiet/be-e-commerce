@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 
 /**
  * Commission update request.
- *
+ * 
  * Backward compatibility notes:
  * - Removed: platformFeePercent, vatPercent (moved to AdminSettings)
  * - autoLockEnabled is now retrieved via GET /api/admin/commission-settings

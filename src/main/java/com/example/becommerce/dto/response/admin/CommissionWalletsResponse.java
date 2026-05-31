@@ -26,4 +26,3 @@ public class CommissionWalletsResponse {
         private final Boolean locked;
     }
 }
-

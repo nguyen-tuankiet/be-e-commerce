@@ -282,7 +282,7 @@ SELECT 'USR-C-' || LPAD(s::text,3,'0') AS code,
 FROM generate_series(1,300) s
 ON CONFLICT (code) DO NOTHING;
 
--- 3.5) Commission wallet demo data (NORMAL / LOW_BALANCE / LOCKED)
+-- 3.5) Commission wallet demo data (status is computed dynamically)
 INSERT INTO wallets (
     user_id,
     balance,
@@ -290,11 +290,10 @@ INSERT INTO wallets (
     total_earned,
     total_withdrawn,
     currency,
-    wallet_status,
     created_at,
     updated_at
 )
-SELECT u.id, 70000, 0, 70000, 0, 'VND', 'NORMAL', NOW(), NOW()
+SELECT u.id, 70000, 0, 70000, 0, 'VND', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-004'
 ON CONFLICT (user_id) DO NOTHING;
 
@@ -305,11 +304,10 @@ INSERT INTO wallets (
     total_earned,
     total_withdrawn,
     currency,
-    wallet_status,
     created_at,
     updated_at
 )
-SELECT u.id, 30000, 0, 50000, 20000, 'VND', 'LOW_BALANCE', NOW(), NOW()
+SELECT u.id, 15000, 0, 35000, 20000, 'VND', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-005'
 ON CONFLICT (user_id) DO NOTHING;
 
@@ -320,11 +318,10 @@ INSERT INTO wallets (
     total_earned,
     total_withdrawn,
     currency,
-    wallet_status,
     created_at,
     updated_at
 )
-SELECT u.id, 15000, 0, 15000, 0, 'VND', 'LOCKED', NOW(), NOW()
+SELECT u.id, 0, 0, 15000, 15000, 'VND', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-T-001'
 ON CONFLICT (user_id) DO NOTHING;
 
@@ -345,9 +342,9 @@ INSERT INTO wallet_transactions (
   transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-002', w.id, 'COMMISSION', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng đơn GU-99210',
-       20000, 0, -20000, 30000,
-       'Khấu trừ phí cố định theo đơn hoàn thành', 'SYSTEM', 'GU-99210',
+SELECT 'TX-COMM-002', w.id, 'COMMISSION', 'COMMISSION_TOPUP', 'Nạp thêm hoa hồng cho thợ Minh',
+       35000, 0, 35000, 35000,
+       'Nạp quỹ để demo trạng thái LOW_BALANCE sau khi khấu trừ', 'ADMIN', 'GU-SEED-002',
        'SUCCESS', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
 FROM wallets w
 JOIN users u ON u.id = w.user_id
@@ -358,14 +355,40 @@ INSERT INTO wallet_transactions (
   transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-003', w.id, 'COMMISSION', 'COMMISSION_REFUND', 'Hoàn hoa hồng đơn GU-SEED-001',
+SELECT 'TX-COMM-003', w.id, 'COMMISSION', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng đơn GU-99210',
+       20000, 0, -20000, 15000,
+       'Khấu trừ phí cố định theo đơn hoàn thành', 'SYSTEM', 'GU-99210',
+       'SUCCESS', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.code = 'USR-005'
+  AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-003');
+
+INSERT INTO wallet_transactions (
+  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  after_balance, note, actor, related_order_code, status, created_at, processed_at
+)
+SELECT 'TX-COMM-004', w.id, 'COMMISSION', 'COMMISSION_TOPUP', 'Nạp hoa hồng khởi tạo cho thợ LOCKED demo',
        15000, 0, 15000, 15000,
-       'Hoàn phí hoa hồng cho kỹ thuật viên', 'ADMIN', 'GU-SEED-001',
-       'SUCCESS', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day'
+       'Tạo lịch sử để kiểm thử lastOrderAt và status LOCKED', 'ADMIN', 'GU-SEED-LOCK-001',
+       'SUCCESS', NOW() - INTERVAL '12 hours', NOW() - INTERVAL '12 hours'
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.code = 'USR-T-001'
-  AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-003');
+  AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-004');
+
+INSERT INTO wallet_transactions (
+  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  after_balance, note, actor, related_order_code, status, created_at, processed_at
+)
+SELECT 'TX-COMM-005', w.id, 'COMMISSION', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng về 0',
+       15000, 0, -15000, 0,
+       'Đưa ví về trạng thái LOCKED theo balance = 0', 'SYSTEM', 'GU-SEED-LOCK-001',
+       'SUCCESS', NOW() - INTERVAL '11 hours', NOW() - INTERVAL '11 hours'
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.code = 'USR-T-001'
+  AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-005');
 
 -- 3) Ensure required categories exist (Sửa điện, Sửa nước, Vệ sinh máy lạnh)
 INSERT INTO categories (code, title, description, icon_url, priority, status, deleted, created_at, updated_at)

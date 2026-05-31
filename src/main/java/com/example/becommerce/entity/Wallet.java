@@ -1,6 +1,5 @@
 package com.example.becommerce.entity;
 
-import com.example.becommerce.entity.enums.WalletStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,10 +56,6 @@ public class Wallet {
     @Builder.Default
     private String currency = "VND";
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    @Builder.Default
-    private WalletStatus walletStatus = WalletStatus.NORMAL;
 
     @Version
     private Long version;

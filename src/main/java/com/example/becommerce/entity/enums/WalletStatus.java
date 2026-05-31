@@ -18,14 +18,19 @@ public enum WalletStatus {
     }
 
     public static WalletStatus fromBalance(BigDecimal balance) {
+        return fromBalance(balance, WalletConstant.DEFAULT_MINIMUM_COMMISSION_BALANCE);
+    }
+
+    public static WalletStatus fromBalance(BigDecimal balance, BigDecimal minimumCommissionBalance) {
         BigDecimal safeBalance = balance == null ? BigDecimal.ZERO : balance;
-        if (safeBalance.compareTo(WalletConstant.DEFAULT_NORMAL_BALANCE_THRESHOLD) >= 0) {
-            return NORMAL;
+        BigDecimal threshold = minimumCommissionBalance == null ? WalletConstant.DEFAULT_MINIMUM_COMMISSION_BALANCE : minimumCommissionBalance;
+
+        if (safeBalance.compareTo(BigDecimal.ZERO) <= 0) {
+            return LOCKED;
         }
-        if (safeBalance.compareTo(WalletConstant.DEFAULT_MINIMUM_COMMISSION_BALANCE) >= 0) {
+        if (safeBalance.compareTo(threshold) <= 0) {
             return LOW_BALANCE;
         }
-        return LOCKED;
+        return NORMAL;
     }
 }
-

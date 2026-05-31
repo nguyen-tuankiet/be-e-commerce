@@ -1,6 +1,6 @@
 # Commission Dashboard API Refactor - Implementation Complete
 
-## 📋 Overview
+##  Overview
 
 Successfully implemented the Commission Dashboard API with the following features:
 1. New GET endpoint for browsing commission wallets
@@ -12,7 +12,7 @@ Successfully implemented the Commission Dashboard API with the following feature
 
 ---
 
-## 🎯 Requirements Met
+##  Requirements Met
 
 ### ✅ 1. New GET Endpoint: Commission Wallets
 
@@ -111,7 +111,7 @@ Successfully implemented the Commission Dashboard API with the following feature
 
 ---
 
-## 📁 Files Modified
+##  Files Modified
 
 ### Entity
 1. **Wallet.java**
@@ -159,7 +159,7 @@ Successfully implemented the Commission Dashboard API with the following feature
 
 ---
 
-## 🔧 System Settings Integration
+##  System Settings Integration
 
 The commission system uses these system settings:
 
@@ -175,7 +175,7 @@ The commission system uses these system settings:
 
 ---
 
-## 💾 Database Migration Required
+##  Database Migration Required
 
 ```sql
 ALTER TABLE wallets ADD COLUMN wallet_status VARCHAR(20) DEFAULT 'NORMAL' NOT NULL;
@@ -189,7 +189,7 @@ V3__add_wallet_status.sql
 
 ---
 
-## 🔄 Commission Processing Flow
+##  Commission Processing Flow
 
 ### When Order Completed:
 
@@ -230,7 +230,7 @@ V3__add_wallet_status.sql
 
 ---
 
-## 🧪 Test Scenarios
+##  Test Scenarios
 
 ### Commission Wallets Endpoint
 
@@ -283,7 +283,7 @@ curl -X GET "http://localhost:8080/api/admin/commission-wallets?page=1&size=10" 
 
 ---
 
-## 🎓 Key Implementation Details
+##  Key Implementation Details
 
 ### WalletStatus Computation
 
@@ -322,7 +322,7 @@ Commission wallets endpoint uses JPA Specifications for:
 
 ---
 
-## 🔒 Security & Validation
+##  Security & Validation
 
 - ✅ Admin-only endpoint (requires ADMIN role)
 - ✅ Transaction-safe with `@Transactional`
@@ -333,7 +333,7 @@ Commission wallets endpoint uses JPA Specifications for:
 
 ---
 
-## 📊 Backward Compatibility
+##  Backward Compatibility
 
 - ✅ Existing transaction queries still work
 - ✅ Legacy fields retained in AndroidTransactionsResponse
@@ -342,7 +342,7 @@ Commission wallets endpoint uses JPA Specifications for:
 
 ---
 
-## 🚀 Deployment Checklist
+##  Deployment Checklist
 
 - [ ] Deploy database migration (wallet_status column)
 - [ ] Compile and build project
@@ -357,7 +357,7 @@ Commission wallets endpoint uses JPA Specifications for:
 
 ---
 
-## 📝 Notes
+##  Notes
 
 ### Configuration
 
@@ -400,4 +400,3 @@ The Commission Dashboard API is fully implemented with:
 **Last Updated**: May 29, 2026  
 **Status**: ✅ COMPLETE - READY FOR DEPLOYMENT  
 **Version**: 1.0.0
-

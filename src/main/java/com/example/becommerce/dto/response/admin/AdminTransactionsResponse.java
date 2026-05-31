@@ -31,7 +31,7 @@ public class AdminTransactionsResponse {
         private final String note;
         private final String actor;
         private final LocalDateTime createdAt;
-
+        
         // Legacy fields for backward compatibility
         private final String time;
         private final String date;
