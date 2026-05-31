@@ -203,12 +203,13 @@ class GrowupApiControllerTest {
                 .processedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
                 .processedBy("Admin AD-9902")
                 .build());
-        when(adminService.updateCommission(any(CommissionUpdateRequest.class))).thenReturn(CommissionResponse.builder()
-                .platformFeePercent(BigDecimal.valueOf(15))
-                .vatPercent(BigDecimal.valueOf(10))
-                .updatedBy("Admin AD-9902")
-                .updatedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
-                .build());
+        when(adminService.updateCommission(any(CommissionUpdateRequest.class)))
+                .thenReturn(CommissionResponse.builder()
+                        .fixedCommissionFee(BigDecimal.valueOf(10000))
+                        .minimumCommissionBalance(BigDecimal.valueOf(50000))
+                        .updatedBy("Admin AD-9902")
+                        .updatedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
+                        .build());
         when(adminService.adjustWallet(any(WalletAdjustRequest.class))).thenReturn(WalletAdjustResponse.builder()
                 .transactionId("TX-ADJ-001")
                 .technicianId("TECH-001")
@@ -238,9 +239,14 @@ class GrowupApiControllerTest {
                 .andExpect(jsonPath("$.data.status").value("approved"));
         adminMvc.perform(patch("/api/admin/commission")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"platformFeePercent\":15,\"vatPercent\":10}"))
+                        .content("""
+                            {
+                              "fixedCommissionFee": 10000,
+                              "minimumCommissionBalance": 50000
+                            }
+                            """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.platformFeePercent").value(15));
+                .andExpect(jsonPath("$.data.fixedCommissionFee").value(10000));
         adminMvc.perform(post("/api/admin/wallet/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

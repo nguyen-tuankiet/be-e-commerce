@@ -283,18 +283,48 @@ FROM generate_series(1,300) s
 ON CONFLICT (code) DO NOTHING;
 
 -- 3.5) Commission wallet demo data (NORMAL / LOW_BALANCE / LOCKED)
-INSERT INTO wallets (user_id, balance, pending_balance, total_earned, total_withdrawn, currency, created_at, updated_at)
-SELECT u.id, 70000, 0, 70000, 0, 'VND', NOW(), NOW()
+INSERT INTO wallets (
+    user_id,
+    balance,
+    pending_balance,
+    total_earned,
+    total_withdrawn,
+    currency,
+    wallet_status,
+    created_at,
+    updated_at
+)
+SELECT u.id, 70000, 0, 70000, 0, 'VND', 'NORMAL', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-004'
 ON CONFLICT (user_id) DO NOTHING;
 
-INSERT INTO wallets (user_id, balance, pending_balance, total_earned, total_withdrawn, currency, created_at, updated_at)
-SELECT u.id, 30000, 0, 50000, 20000, 'VND', NOW(), NOW()
+INSERT INTO wallets (
+    user_id,
+    balance,
+    pending_balance,
+    total_earned,
+    total_withdrawn,
+    currency,
+    wallet_status,
+    created_at,
+    updated_at
+)
+SELECT u.id, 30000, 0, 50000, 20000, 'VND', 'LOW_BALANCE', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-005'
 ON CONFLICT (user_id) DO NOTHING;
 
-INSERT INTO wallets (user_id, balance, pending_balance, total_earned, total_withdrawn, currency, created_at, updated_at)
-SELECT u.id, 15000, 0, 15000, 0, 'VND', NOW(), NOW()
+INSERT INTO wallets (
+    user_id,
+    balance,
+    pending_balance,
+    total_earned,
+    total_withdrawn,
+    currency,
+    wallet_status,
+    created_at,
+    updated_at
+)
+SELECT u.id, 15000, 0, 15000, 0, 'VND', 'LOCKED', NOW(), NOW()
 FROM users u WHERE u.code = 'USR-T-001'
 ON CONFLICT (user_id) DO NOTHING;
 
