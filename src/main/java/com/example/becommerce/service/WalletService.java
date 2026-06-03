@@ -24,7 +24,7 @@ public interface WalletService {
 
     WalletResponse getCurrentWallet();
 
-    PagedResponse<WalletTransactionResponse> getTransactions(String type, String walletType, int page, int limit);
+    PagedResponse<WalletTransactionResponse> getTransactions(String type, int page, int limit);
 
     WalletTopUpResponse topUp(WalletTopUpRequest request);
 
@@ -42,6 +42,7 @@ public interface WalletService {
 
     void createWalletForUser(com.example.becommerce.entity.User user);
 }
+
 
 
 

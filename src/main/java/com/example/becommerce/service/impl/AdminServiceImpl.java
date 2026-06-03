@@ -26,7 +26,6 @@ import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
 import com.example.becommerce.entity.enums.UserStatus;
 import com.example.becommerce.entity.enums.WalletStatus;
-import com.example.becommerce.entity.enums.WalletType;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.CategoryRepository;
 import com.example.becommerce.repository.OrderRepository;
@@ -378,7 +377,7 @@ public class AdminServiceImpl implements AdminService {
 
         Wallet wallet = walletRepository.findWithLockByUser_Id(transaction.getWallet().getUser().getId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy ví"));
-        wallet.setPendingWithdrawBalance(wallet.getPendingWithdrawBalance().subtract(transaction.getNetAmount()));
+        wallet.setPendingBalance(wallet.getPendingBalance().subtract(transaction.getNetAmount()));
         walletRepository.save(wallet);
 
         transaction.setStatus(TransactionStatus.SUCCESS);
@@ -502,18 +501,17 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy kỹ thuật viên"));
         Wallet wallet = walletRepository.findWithLockByUser_Id(technician.getId())
                 .orElseGet(() -> walletRepository.save(Wallet.builder().user(technician).currency("VND").build()));
-        BigDecimal newBalance = wallet.getCreditBalance().add(request.getAmount());
+        BigDecimal newBalance = wallet.getBalance().add(request.getAmount());
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
             throw AppException.badRequest(ErrorCode.INSUFFICIENT_BALANCE, "Số dư ví không đủ để điều chỉnh");
         }
-        wallet.setCreditBalance(newBalance);
+        wallet.setBalance(newBalance);
         walletRepository.save(wallet);
 
         WalletTransaction transaction = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
                 .wallet(wallet)
                 .type(TransactionType.COMMISSION)
-                .walletType(WalletType.CREDIT)
                 .category(request.getType())
                 .title(request.getReason())
                 .amount(request.getAmount())
@@ -531,7 +529,7 @@ public class AdminServiceImpl implements AdminService {
                 .transactionId(transaction.getTransactionCode())
                 .technicianId(technician.getCode())
                 .amount(request.getAmount())
-                .newBalance(wallet.getCreditBalance())
+                .newBalance(wallet.getBalance())
                 .reason(request.getReason())
                 .createdAt(transaction.getCreatedAt())
                 .build();
@@ -571,7 +569,7 @@ public class AdminServiceImpl implements AdminService {
     private AdminTransactionsResponse.Item toTransactionItem(WalletTransaction transaction) {
         User user = transaction.getWallet().getUser();
         String orderCode = transaction.getOrder() != null ? transaction.getOrder().getCode() : (transaction.getRelatedOrderCode() != null ? transaction.getRelatedOrderCode() : "");
-        WalletStatus walletStatus = resolveCommissionWalletStatus(transaction.getWallet().getCreditBalance(), getMinimumCommissionBalance());
+        WalletStatus walletStatus = resolveCommissionWalletStatus(transaction.getWallet().getBalance(), getMinimumCommissionBalance());
 
         return AdminTransactionsResponse.Item.builder()
                 .id(transaction.getTransactionCode())
@@ -602,12 +600,12 @@ public class AdminServiceImpl implements AdminService {
         totalCommissionPaid = totalCommissionPaid == null ? BigDecimal.ZERO : totalCommissionPaid.abs();
 
         LocalDateTime lastOrderAt = walletTransactionRepository.findLastOrderActivityAt(wallet.getId());
-        WalletStatus walletStatus = resolveCommissionWalletStatus(wallet.getCreditBalance(), minimumCommissionBalance);
+        WalletStatus walletStatus = resolveCommissionWalletStatus(wallet.getBalance(), minimumCommissionBalance);
 
         return CommissionWalletsResponse.Item.builder()
                 .technicianId(wallet.getUser().getId())
                 .technicianName(wallet.getUser().getFullName())
-                .walletBalance(wallet.getCreditBalance())
+                .walletBalance(wallet.getBalance())
                 .walletStatus(walletStatus.apiValue())
                 .totalCommissionPaid(totalCommissionPaid)
                 .lastOrderAt(lastOrderAt)

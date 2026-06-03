@@ -19,7 +19,6 @@ public class WalletTransactionMapper {
         return WalletTransactionResponse.builder()
                 .id(transaction.getTransactionCode())
                 .type(transaction.getType().apiValue())
-                .walletType(transaction.getWalletType() != null ? transaction.getWalletType().apiValue() : null)
                 .title(transaction.getTitle())
                 .category(transaction.getCategory())
                 .amount(MoneyUtils.displayAmount(transaction.getType(), transaction.getAmount()))

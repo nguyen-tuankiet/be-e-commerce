@@ -3,7 +3,6 @@ package com.example.becommerce.repository;
 import com.example.becommerce.entity.WalletTransaction;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
-import com.example.becommerce.entity.enums.WalletType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,14 +28,6 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     Page<WalletTransaction> findByWallet_User_IdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     Page<WalletTransaction> findByWallet_User_IdAndTypeOrderByCreatedAtDesc(Long userId, TransactionType type, Pageable pageable);
-
-    Page<WalletTransaction> findByWallet_User_IdAndWalletTypeOrderByCreatedAtDesc(Long userId, WalletType walletType, Pageable pageable);
-
-    Page<WalletTransaction> findByWallet_User_IdAndTypeAndWalletTypeOrderByCreatedAtDesc(
-            Long userId,
-            TransactionType type,
-            WalletType walletType,
-            Pageable pageable);
 
     List<WalletTransaction> findByTypeOrderByCreatedAtDesc(TransactionType type);
 

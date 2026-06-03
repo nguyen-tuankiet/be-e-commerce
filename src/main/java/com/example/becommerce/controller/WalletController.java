@@ -57,11 +57,10 @@ public class WalletController {
     @GetMapping(TRANSACTIONS_PATH)
     public ResponseEntity<ApiResponse<PagedResponse<WalletTransactionResponse>>> getTransactions(
             @RequestParam(defaultValue = "all") String type,
-            @RequestParam(defaultValue = "all") String walletType,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "10") @Min(1) int limit) {
 
-        return ResponseEntity.ok(ApiResponse.success(walletService.getTransactions(type, walletType, page, limit)));
+        return ResponseEntity.ok(ApiResponse.success(walletService.getTransactions(type, page, limit)));
     }
 
     @PostMapping(TOPUP_PATH)
@@ -96,6 +95,7 @@ public class WalletController {
         return ResponseEntity.ok(ApiResponse.success(walletService.deleteBankAccount(id)));
     }
 }
+
 
 
 

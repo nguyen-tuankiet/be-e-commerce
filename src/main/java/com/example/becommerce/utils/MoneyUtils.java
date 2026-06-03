@@ -25,11 +25,8 @@ public final class MoneyUtils {
 
     public static BigDecimal displayAmount(TransactionType type, BigDecimal amount) {
         BigDecimal normalized = safeZero(amount);
-        if (normalized.compareTo(BigDecimal.ZERO) < 0) {
-            return normalized;
-        }
         return switch (type) {
-            case WITHDRAW -> normalized.negate();
+            case COMMISSION, PAYMENT, WITHDRAW -> normalized.negate();
             default -> normalized;
         };
     }
@@ -48,3 +45,4 @@ public final class MoneyUtils {
         return transferPrefix + " - " + safeZero(amount).toPlainString();
     }
 }
+

@@ -3,7 +3,6 @@ package com.example.becommerce.entity;
 import com.example.becommerce.entity.enums.PaymentMethod;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
-import com.example.becommerce.entity.enums.WalletType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,10 +50,6 @@ public class WalletTransaction {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private TransactionType type;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "wallet_type", nullable = false, length = 30)
-    private WalletType walletType;
 
     @Column(nullable = false, length = 120)
     private String category;
@@ -121,4 +116,5 @@ public class WalletTransaction {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 }
+
 

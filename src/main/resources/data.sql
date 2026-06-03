@@ -283,7 +283,19 @@ FROM generate_series(1,300) s
 ON CONFLICT (code) DO NOTHING;
 
 -- 3.5) Commission wallet demo data (status is computed dynamically)
--- 3.5) Commission wallet demo data (status is computed dynamically)
+INSERT INTO wallets (
+    user_id,
+    balance,
+    pending_balance,
+    total_earned,
+    total_withdrawn,
+    currency,
+    created_at,
+    updated_at
+)
+SELECT u.id, 70000, 0, 70000, 0, 'VND', NOW(), NOW()
+FROM users u WHERE u.code = 'USR-004'
+ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallets (
     user_id,
@@ -291,28 +303,13 @@ INSERT INTO wallets (
     pending_balance,
     total_earned,
     total_withdrawn,
-    credit_balance,
-    personal_balance,
-    pending_withdraw_balance,
     currency,
     created_at,
     updated_at
 )
-SELECT
-    u.id,
-    70000,
-    0,
-    70000,
-    0,
-    70000,  -- credit_balance
-    0,      -- personal_balance
-    0,      -- pending_withdraw_balance
-    'VND',
-    NOW(),
-    NOW()
-FROM users u
-WHERE u.code = 'USR-004'
-    ON CONFLICT (user_id) DO NOTHING;
+SELECT u.id, 15000, 0, 35000, 20000, 'VND', NOW(), NOW()
+FROM users u WHERE u.code = 'USR-005'
+ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallets (
     user_id,
@@ -320,57 +317,13 @@ INSERT INTO wallets (
     pending_balance,
     total_earned,
     total_withdrawn,
-    credit_balance,
-    personal_balance,
-    pending_withdraw_balance,
     currency,
     created_at,
     updated_at
 )
-SELECT
-    u.id,
-    15000,
-    0,
-    35000,
-    20000,
-    15000,  -- credit_balance
-    0,      -- personal_balance
-    0,      -- pending_withdraw_balance
-    'VND',
-    NOW(),
-    NOW()
-FROM users u
-WHERE u.code = 'USR-005'
-    ON CONFLICT (user_id) DO NOTHING;
-
-INSERT INTO wallets (
-    user_id,
-    balance,
-    pending_balance,
-    total_earned,
-    total_withdrawn,
-    credit_balance,
-    personal_balance,
-    pending_withdraw_balance,
-    currency,
-    created_at,
-    updated_at
-)
-SELECT
-    u.id,
-    0,
-    0,
-    15000,
-    15000,
-    0,      -- credit_balance
-    0,      -- personal_balance
-    0,      -- pending_withdraw_balance
-    'VND',
-    NOW(),
-    NOW()
-FROM users u
-WHERE u.code = 'USR-T-001'
-    ON CONFLICT (user_id) DO NOTHING;
+SELECT u.id, 0, 0, 15000, 15000, 'VND', NOW(), NOW()
+FROM users u WHERE u.code = 'USR-T-001'
+ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallet_transactions (
   transaction_code, wallet_id, type, category, title, amount, fee, net_amount,

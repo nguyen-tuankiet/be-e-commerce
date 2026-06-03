@@ -23,6 +23,7 @@ public interface WalletRepository extends JpaRepository<Wallet, Long>, JpaSpecif
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Wallet> findWithLockByUser_Id(Long userId);
 
-    @Query("select coalesce(sum(w.creditBalance + w.personalBalance), 0) from Wallet w")
+    @Query("select coalesce(sum(w.balance), 0) from Wallet w")
     BigDecimal sumBalance();
 }
+
