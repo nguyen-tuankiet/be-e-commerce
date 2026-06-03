@@ -7,17 +7,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Commission update response.
- *
- * Backward compatibility notes:
- * - Removed: platformFeePercent, vatPercent (moved to AdminSettings)
- * - autoLockEnabled is now retrieved via GET /api/admin/commission-settings
+ * Commission settings response.
+ * Retrieved via GET /api/admin/commission-settings
+ * Contains the complete commission configuration including auto-lock settings.
  */
 @Getter
 @Builder
-public class CommissionResponse {
+public class CommissionSettingsResponse {
     private final BigDecimal fixedCommissionFee;
     private final BigDecimal minimumCommissionBalance;
-    private final String updatedBy;
+    private final Boolean autoLockEnabled;
     private final LocalDateTime updatedAt;
 }

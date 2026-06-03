@@ -133,39 +133,39 @@ class GrowupApiControllerTest {
 
     @Test
     void adminDashboardApisReturnExpectedContracts() throws Exception {
-        when(adminService.getStats()).thenReturn(AdminStatsResponse.builder()
+        when(adminService.getStats(anyString(), any(), any(), any())).thenReturn(AdminStatsResponse.builder()
                 .totalRevenue(metric(3240000000L))
                 .totalProfit(metric(486000000))
                 .activeTechnicians(metric(1204))
-                .ordersToday(metric(42))
+                .totalOrders(metric(42))
                 .build());
-        when(adminService.getRevenueStats("7days")).thenReturn(RevenueStatsResponse.builder()
-                .range("7days")
+        when(adminService.getRevenueStats(anyString(), any(), any(), any())).thenReturn(RevenueStatsResponse.builder()
+                .range("month")
                 .items(List.of(RevenueStatsResponse.Item.builder()
-                        .label("Thứ 2")
+                        .label("Tháng 5")
                         .value(BigDecimal.valueOf(45))
                         .date(LocalDate.of(2026, 5, 1))
                         .build()))
                 .build());
-        when(adminService.getServiceDistribution()).thenReturn(ServiceDistributionResponse.builder()
+        when(adminService.getServiceDistribution(anyString(), any(), any(), any())).thenReturn(ServiceDistributionResponse.builder()
                 .items(List.of(ServiceDistributionResponse.Item.builder()
                         .name("Máy lạnh")
                         .percentage(BigDecimal.valueOf(40))
                         .color("#3b82f6")
                         .build()))
                 .build());
-        when(adminService.getRecentOrders(5)).thenReturn(RecentOrdersResponse.builder().items(List.of()).build());
+        when(adminService.getRecentOrders(anyString(), any(), any(), any(), anyInt())).thenReturn(RecentOrdersResponse.builder().items(List.of()).build());
 
-        adminMvc.perform(get("/api/admin/stats"))
+        adminMvc.perform(get("/api/admin/dashboard/stats"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalRevenue.value").value(3240000000L));
-        adminMvc.perform(get("/api/admin/stats/revenue").param("range", "7days"))
+        adminMvc.perform(get("/api/admin/dashboard/revenue").param("mode", "month"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.range").value("7days"));
+                .andExpect(jsonPath("$.data.range").value("month"));
         adminMvc.perform(get("/api/admin/stats/service-distribution"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].name").value("Máy lạnh"));
-        adminMvc.perform(get("/api/admin/orders/recent").param("limit", "5"))
+        adminMvc.perform(get("/api/admin/dashboard/recent-orders").param("limit", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items").isArray());
     }
@@ -203,12 +203,13 @@ class GrowupApiControllerTest {
                 .processedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
                 .processedBy("Admin AD-9902")
                 .build());
-        when(adminService.updateCommission(any(CommissionUpdateRequest.class))).thenReturn(CommissionResponse.builder()
-                .platformFeePercent(BigDecimal.valueOf(15))
-                .vatPercent(BigDecimal.valueOf(10))
-                .updatedBy("Admin AD-9902")
-                .updatedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
-                .build());
+        when(adminService.updateCommission(any(CommissionUpdateRequest.class)))
+                .thenReturn(CommissionResponse.builder()
+                        .fixedCommissionFee(BigDecimal.valueOf(10000))
+                        .minimumCommissionBalance(BigDecimal.valueOf(50000))
+                        .updatedBy("Admin AD-9902")
+                        .updatedAt(LocalDateTime.of(2026, 5, 7, 10, 0))
+                        .build());
         when(adminService.adjustWallet(any(WalletAdjustRequest.class))).thenReturn(WalletAdjustResponse.builder()
                 .transactionId("TX-ADJ-001")
                 .technicianId("TECH-001")
@@ -238,9 +239,14 @@ class GrowupApiControllerTest {
                 .andExpect(jsonPath("$.data.status").value("approved"));
         adminMvc.perform(patch("/api/admin/commission")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"platformFeePercent\":15,\"vatPercent\":10}"))
+                        .content("""
+                            {
+                              "fixedCommissionFee": 10000,
+                              "minimumCommissionBalance": 50000
+                            }
+                            """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.platformFeePercent").value(15));
+                .andExpect(jsonPath("$.data.fixedCommissionFee").value(10000));
         adminMvc.perform(post("/api/admin/wallet/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

@@ -1,0 +1,185 @@
+{
+  "info": {
+    "name": "Commission API Refactor - Test Examples",
+    "description": "Test cases and examples for the refactored commission settings API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Update Commission Settings",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fixedCommissionFee\": 10000,\n  \"minimumCommissionBalance\": 20000\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/commission",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "commission"]
+        },
+        "description": "Update commission settings with fixed fee and minimum balance.\n\nBreaking Change: autoLockEnabled is no longer accepted in the request.\nResponse no longer includes autoLockEnabled field."
+      },
+      "response": [
+        {
+          "name": "200 - Success",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fixedCommissionFee\": 10000,\n  \"minimumCommissionBalance\": 20000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/commission",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "commission"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n  \"data\": {\n    \"fixedCommissionFee\": 10000,\n    \"minimumCommissionBalance\": 20000,\n    \"updatedAt\": \"2026-05-29T12:30:00\",\n    \"updatedBy\": \"Admin admin@example.com\"\n  },\n  \"success\": true,\n  \"message\": null\n}"
+        },
+        {
+          "name": "400 - Invalid Request (autoLockEnabled included)",
+          "status": "Bad Request",
+          "code": 400,
+          "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed\",\n  \"errors\": {\n    \"autoLockEnabled\": \"Unknown property 'autoLockEnabled' - this field is no longer supported\"\n  }\n}"
+        },
+        {
+          "name": "400 - Missing Required Field",
+          "status": "Bad Request",
+          "code": 400,
+          "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed\",\n  \"errors\": {\n    \"fixedCommissionFee\": \"Fixed commission fee is required\"\n  }\n}"
+        },
+        {
+          "name": "400 - Negative Value",
+          "status": "Bad Request",
+          "code": 400,
+          "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed\",\n  \"errors\": {\n    \"fixedCommissionFee\": \"Fixed commission fee must be greater than or equal to 0\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "2. Get Commission Settings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/commission-settings",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "commission-settings"]
+        },
+        "description": "Retrieve current commission settings including the auto-lock status.\n\nNew Endpoint: Use this endpoint to get the complete commission configuration.\nAutoLockEnabled is only available in this endpoint, not in the PATCH response."
+      },
+      "response": [
+        {
+          "name": "200 - Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/commission-settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "commission-settings"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n  \"data\": {\n    \"fixedCommissionFee\": 10000,\n    \"minimumCommissionBalance\": 20000,\n    \"autoLockEnabled\": true,\n    \"updatedAt\": \"2026-05-29T12:30:00\"\n  },\n  \"success\": true,\n  \"message\": null\n}"
+        }
+      ]
+    },
+    {
+      "name": "3. Migration Test - Old Request (WILL FAIL)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fixedCommissionFee\": 10000,\n  \"minimumCommissionBalance\": 20000,\n  \"autoLockEnabled\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/commission",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "commission"]
+        },
+        "description": "BREAKING CHANGE: This request will fail with 400 validation error.\nThe 'autoLockEnabled' field is no longer accepted in the request.\n\nUse Case: Demonstrates the breaking change for clients upgrading from the old API."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ]
+}

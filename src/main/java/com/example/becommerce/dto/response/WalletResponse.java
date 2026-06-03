@@ -17,6 +17,7 @@ public class WalletResponse {
 
     private String userId;
     private BigDecimal balance;
+    private String status;
     private BigDecimal pendingBalance;
     private BigDecimal totalEarned;
     private BigDecimal totalWithdrawn;

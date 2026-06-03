@@ -43,6 +43,10 @@ public class WalletTransaction {
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private TransactionType type;
@@ -63,6 +67,17 @@ public class WalletTransaction {
     @Column(name = "net_amount", nullable = false, precision = 19, scale = 0)
     @Builder.Default
     private BigDecimal netAmount = BigDecimal.ZERO;
+
+    private Long afterBalance;
+
+    @Column(length = 255)
+    private String note;
+
+    @Column(length = 50)
+    private String actor;
+
+    @Column(length = 100)
+    private String relatedOrderCode;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

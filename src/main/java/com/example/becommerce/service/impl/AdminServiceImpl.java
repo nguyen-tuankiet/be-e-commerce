@@ -9,6 +9,8 @@ import com.example.becommerce.dto.response.admin.AdminSettingsSavedResponse;
 import com.example.becommerce.dto.response.admin.AdminStatsResponse;
 import com.example.becommerce.dto.response.admin.AdminTransactionsResponse;
 import com.example.becommerce.dto.response.admin.CommissionResponse;
+import com.example.becommerce.dto.response.admin.CommissionSettingsResponse;
+import com.example.becommerce.dto.response.admin.CommissionWalletsResponse;
 import com.example.becommerce.dto.response.admin.RecentOrdersResponse;
 import com.example.becommerce.dto.response.admin.RevenueStatsResponse;
 import com.example.becommerce.dto.response.admin.ServiceDistributionResponse;
@@ -23,8 +25,10 @@ import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
 import com.example.becommerce.entity.enums.UserStatus;
+import com.example.becommerce.entity.enums.WalletStatus;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.CategoryRepository;
+import com.example.becommerce.repository.OrderRepository;
 import com.example.becommerce.repository.SystemSettingRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.repository.WalletRepository;
@@ -38,93 +42,286 @@ import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.context.ApplicationContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 @Service
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
 
     private static final String SETTINGS_KEY = "admin.settings";
+    private static final String FIXED_COMMISSION_FEE_KEY = "fixed_commission_fee";
+    private static final String MINIMUM_COMMISSION_BALANCE_KEY = "minimum_commission_balance";
+    private static final String AUTO_LOCK_ENABLED_KEY = "auto_lock_enabled";
     private static final String[] COLORS = {"#3b82f6", "#8b5cf6", "#f59e0b", "#06b6d4", "#22c55e"};
 
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final OrderRepository orderRepository;
     private final SystemSettingRepository systemSettingRepository;
     private final TransactionCodeGenerator transactionCodeGenerator;
     private final ObjectMapper objectMapper;
+    private final ApplicationContext applicationContext;
 
     @Override
     @Transactional(readOnly = true)
-    public AdminStatsResponse getStats() {
-        BigDecimal revenue = walletTransactionRepository.sumNetAmountByStatus(TransactionStatus.SUCCESS);
-        BigDecimal profit = walletTransactionRepository.sumFeeByStatus(TransactionStatus.SUCCESS);
+    public AdminStatsResponse getStats(String mode, Integer year, Integer quarter, Integer month) {
+        var range = computeRange(mode, year, quarter, month);
+        LocalDateTime from = range[0];
+        LocalDateTime to = range[1];
+
+        long completedCount = orderRepository.countByCompletedAtBetweenAndDeletedFalse(from, to);
+
+        // Sum revenue by aggregating group queries (works for month/day ranges)
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        if ("month".equalsIgnoreCase(mode)) {
+            List<Object[]> rows = orderRepository.sumFinalPriceGroupByDay(from, to);
+            for (Object[] row : rows) {
+                Object val = row[1];
+                totalRevenue = totalRevenue.add(toBigDecimal(val));
+            }
+        } else {
+            List<Object[]> rows = orderRepository.sumFinalPriceGroupByMonth(from, to);
+            for (Object[] row : rows) {
+                Object val = row[1];
+                totalRevenue = totalRevenue.add(toBigDecimal(val));
+            }
+        }
+
+        BigDecimal totalProfit = BigDecimal.valueOf(10000).multiply(BigDecimal.valueOf(completedCount));
         long activeTechnicians = userRepository.countByRoleAndStatusAndDeletedFalse(Role.TECHNICIAN, UserStatus.ACTIVE);
 
         return AdminStatsResponse.builder()
-                .totalRevenue(metric(revenue, BigDecimal.ZERO))
-                .totalProfit(metric(profit, BigDecimal.ZERO))
+                .totalRevenue(metric(totalRevenue, BigDecimal.ZERO))
+                .totalProfit(metric(totalProfit, BigDecimal.ZERO))
                 .activeTechnicians(metric(BigDecimal.valueOf(activeTechnicians), BigDecimal.ZERO))
-                .ordersToday(metric(BigDecimal.ZERO, BigDecimal.ZERO))
+                .totalOrders(metric(BigDecimal.valueOf(completedCount), BigDecimal.ZERO))
                 .build();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public RevenueStatsResponse getRevenueStats(String range) {
-        int days = parseRangeDays(range);
-        LocalDate startDate = LocalDate.now().minusDays(days - 1L);
+    public RevenueStatsResponse getRevenueStats(String mode, Integer year, Integer quarter, Integer month) {
+        mode = StringUtils.hasText(mode) ? mode.toLowerCase() : "month";
+
+        var range = computeRange(mode, year, quarter, month);
+        LocalDateTime from = range[0];
+        LocalDateTime to = range[1];
+
+        String rangeLabel;
         List<RevenueStatsResponse.Item> items = new ArrayList<>();
-        for (int i = 0; i < days; i++) {
-            LocalDate date = startDate.plusDays(i);
-            BigDecimal value = walletTransactionRepository.sumNetAmountByStatusAndCreatedAtBetween(
-                    TransactionStatus.SUCCESS, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
-            items.add(RevenueStatsResponse.Item.builder()
-                    .label(labelOf(date))
-                    .value(value)
-                    .date(date)
-                    .build());
+
+        if ("all-time".equals(mode)) {
+            rangeLabel = "All-time";
+            List<Object[]> results = orderRepository.sumFinalPriceGroupByMonth(from, to);
+            for (Object[] row : results) {
+                String monthStr = (String) row[0];
+                BigDecimal value = toBigDecimal(row[1]);
+                YearMonth ym = YearMonth.parse(monthStr);
+                String label = "Thg " + ym.getMonthValue() + " " + ym.getYear();
+                items.add(RevenueStatsResponse.Item.builder()
+                        .label(label)
+                        .date(ym.atDay(1).atStartOfDay().toLocalDate())
+                        .value(value)
+                        .build());
+            }
+        } else if ("year".equals(mode) && year != null) {
+            rangeLabel = "Year " + year;
+            List<Object[]> results = orderRepository.sumFinalPriceGroupByMonth(from, to);
+            Map<Integer, BigDecimal> monthMap = new TreeMap<>();
+            for (Object[] row : results) {
+                String monthStr = (String) row[0];
+                BigDecimal value = toBigDecimal(row[1]);
+                YearMonth ym = YearMonth.parse(monthStr);
+                monthMap.put(ym.getMonthValue(), value);
+            }
+            for (int m = 1; m <= 12; m++) {
+                BigDecimal value = monthMap.getOrDefault(m, BigDecimal.ZERO);
+                String label = "Thg " + m;
+                items.add(RevenueStatsResponse.Item.builder()
+                        .label(label)
+                        .date(LocalDate.of(year, m, 1))
+                        .value(value)
+                        .build());
+            }
+        } else if ("quarter".equals(mode) && year != null && quarter != null) {
+            rangeLabel = "Q" + quarter + " " + year;
+            List<Object[]> results = orderRepository.sumFinalPriceGroupByMonth(from, to);
+            Map<Integer, BigDecimal> monthMap = new TreeMap<>();
+            for (Object[] row : results) {
+                String monthStr = (String) row[0];
+                BigDecimal value = toBigDecimal(row[1]);
+                YearMonth ym = YearMonth.parse(monthStr);
+                monthMap.put(ym.getMonthValue(), value);
+            }
+            int startMonth = (quarter - 1) * 3 + 1;
+            int endMonth = startMonth + 2;
+            for (int m = startMonth; m <= endMonth; m++) {
+                BigDecimal value = monthMap.getOrDefault(m, BigDecimal.ZERO);
+                String label = "Thg " + m;
+                items.add(RevenueStatsResponse.Item.builder()
+                        .label(label)
+                        .date(LocalDate.of(year, m, 1))
+                        .value(value)
+                        .build());
+            }
+        } else {
+            // month
+            int y = year != null ? year : LocalDate.now().getYear();
+            int m = month != null ? month : LocalDate.now().getMonthValue();
+            LocalDate firstDay = LocalDate.of(y, m, 1);
+            int daysInMonth = firstDay.lengthOfMonth();
+            rangeLabel = "Month " + m + "/" + y;
+            List<Object[]> results = orderRepository.sumFinalPriceGroupByDay(from, to);
+            Map<Integer, BigDecimal> dayMap = new TreeMap<>();
+            for (Object[] row : results) {
+                String dayStr = (String) row[0];
+                BigDecimal value = toBigDecimal(row[1]);
+                LocalDate date = LocalDate.parse(dayStr);
+                dayMap.put(date.getDayOfMonth(), value);
+            }
+            for (int d = 1; d <= daysInMonth; d++) {
+                BigDecimal value = dayMap.getOrDefault(d, BigDecimal.ZERO);
+                LocalDate date = LocalDate.of(y, m, d);
+                String label = "Ngày " + d;
+                items.add(RevenueStatsResponse.Item.builder()
+                        .label(label)
+                        .date(date)
+                        .value(value)
+                        .build());
+            }
         }
+
         return RevenueStatsResponse.builder()
-                .range(StringUtils.hasText(range) ? range : "7days")
+                .range(rangeLabel)
                 .items(items)
                 .build();
     }
 
+    public AdminStatsResponse getStats() {
+        // delegate through proxy so @Transactional on the parameterized method is honored
+        AdminService proxy = applicationContext.getBean(AdminService.class);
+        return proxy.getStats("month", null, null, null);
+    }
+
     @Override
     @Transactional(readOnly = true)
-    public ServiceDistributionResponse getServiceDistribution() {
+    public ServiceDistributionResponse getServiceDistribution(String mode, Integer year, Integer quarter, Integer month) {
+        mode = StringUtils.hasText(mode) ? mode.toLowerCase() : "month";
+        var range = computeRange(mode, year, quarter, month);
+        LocalDateTime from = range[0];
+        LocalDateTime to = range[1];
+
+        long totalOrders = orderRepository.countByCompletedAtBetweenAndDeletedFalse(from, to);
+        if (totalOrders == 0) {
+            return ServiceDistributionResponse.builder().items(new ArrayList<>()).build();
+        }
+
         var categories = categoryRepository.findByDeletedFalseOrderByPriorityDescCreatedAtDesc();
-        int total = Math.max(categories.size(), 1);
         List<ServiceDistributionResponse.Item> items = new ArrayList<>();
         for (int i = 0; i < categories.size(); i++) {
-            items.add(ServiceDistributionResponse.Item.builder()
-                    .name(categories.get(i).getTitle())
-                    .percentage(BigDecimal.valueOf(100).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP))
-                    .color(COLORS[i % COLORS.length])
-                    .build());
+            var category = categories.get(i);
+            long count = orderRepository.countByCategoryIdAndCompletedAtBetweenAndDeletedFalse(category.getId(), from, to);
+            if (count > 0) {
+                BigDecimal percentage = BigDecimal.valueOf(count)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalOrders), 2, RoundingMode.HALF_UP);
+                items.add(ServiceDistributionResponse.Item.builder()
+                        .name(category.getTitle())
+                        .percentage(percentage)
+                        .color(COLORS[i % COLORS.length])
+                        .build());
+            }
         }
         return ServiceDistributionResponse.builder().items(items).build();
     }
 
     @Override
-    public RecentOrdersResponse getRecentOrders(int limit) {
-        return RecentOrdersResponse.builder().items(List.of()).build();
+    @Transactional(readOnly = true)
+    public RecentOrdersResponse getRecentOrders(String mode, Integer year, Integer quarter, Integer month, int limit) {
+        var range = computeRange(mode, year, quarter, month);
+        LocalDateTime from = range[0];
+        LocalDateTime to = range[1];
+
+        Pageable pageable = PageRequest.of(0, Math.max(1, limit), Sort.by(Sort.Direction.DESC, "scheduledAt"));
+        Page<com.example.becommerce.entity.Order> orderPage = orderRepository.findByCompletedAtBetweenAndDeletedFalseOrderByScheduledAtDesc(from, to, pageable);
+
+        List<RecentOrdersResponse.Item> items = orderPage.getContent().stream()
+                .map(order -> RecentOrdersResponse.Item.builder()
+                        .id(order.getCode())
+                        .customer(RecentOrdersResponse.Person.builder()
+                                .fullName(order.getCustomer().getFullName())
+                                .build())
+                        .technician(order.getTechnician() != null ? RecentOrdersResponse.Person.builder()
+                                .fullName(order.getTechnician().getFullName())
+                                .build() : null)
+                        .serviceName(order.getServiceName())
+                        .status(order.getStatus().apiValue())
+                        .scheduledAt(order.getScheduledAt())
+                        .amount(BigDecimal.valueOf(order.getFinalPrice() != null ? order.getFinalPrice() : 0))
+                        .build())
+                .toList();
+
+        return RecentOrdersResponse.builder().items(items).build();
+    }
+
+    // helper: compute range from mode/year/quarter/month
+    private LocalDateTime[] computeRange(String mode, Integer year, Integer quarter, Integer month) {
+        mode = StringUtils.hasText(mode) ? mode.toLowerCase() : "month";
+        LocalDateTime from;
+        LocalDateTime to = LocalDateTime.now();
+
+        if ("all-time".equals(mode)) {
+            from = LocalDateTime.of(2000, 1, 1, 0, 0, 0);
+        } else if ("year".equals(mode) && year != null) {
+            from = LocalDateTime.of(year, 1, 1, 0, 0, 0);
+            LocalDate lastDayOfYear = YearMonth.of(year, 12).atEndOfMonth();
+            to = LocalDateTime.of(lastDayOfYear, java.time.LocalTime.of(23, 59, 59));
+        } else if ("quarter".equals(mode) && year != null && quarter != null) {
+            int startMonth = (quarter - 1) * 3 + 1;
+            int endMonth = startMonth + 2;
+            from = LocalDateTime.of(year, startMonth, 1, 0, 0, 0);
+            LocalDate lastDayOfQuarter = YearMonth.of(year, endMonth).atEndOfMonth();
+            to = LocalDateTime.of(lastDayOfQuarter, java.time.LocalTime.of(23, 59, 59));
+        } else {
+            int y = year != null ? year : LocalDate.now().getYear();
+            int m = month != null ? month : LocalDate.now().getMonthValue();
+            from = LocalDateTime.of(y, m, 1, 0, 0, 0);
+            LocalDate lastDayOfMonth = YearMonth.of(y, m).atEndOfMonth();
+            to = LocalDateTime.of(lastDayOfMonth, java.time.LocalTime.of(23, 59, 59));
+        }
+        return new LocalDateTime[]{from, to};
+    }
+
+    private BigDecimal toBigDecimal(Object val) {
+        if (val instanceof BigDecimal) return (BigDecimal) val;
+        if (val instanceof Number) return BigDecimal.valueOf(((Number) val).longValue());
+        if (val == null) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(val.toString());
+        } catch (Exception ex) {
+            return BigDecimal.ZERO;
+        }
     }
 
     @Override
@@ -198,15 +395,102 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public CommissionResponse updateCommission(CommissionUpdateRequest request) {
-        AdminSettingsRequest settings = getSettings();
-        settings.getBilling().setPlatformFeePercent(request.getPlatformFeePercent());
-        settings.getBilling().setVatPercent(request.getVatPercent());
-        updateSettings(settings);
+        saveSystemSetting(FIXED_COMMISSION_FEE_KEY, request.getFixedCommissionFee().toPlainString());
+        saveSystemSetting(MINIMUM_COMMISSION_BALANCE_KEY, request.getMinimumCommissionBalance().toPlainString());
         return CommissionResponse.builder()
-                .platformFeePercent(request.getPlatformFeePercent())
-                .vatPercent(request.getVatPercent())
+                .fixedCommissionFee(request.getFixedCommissionFee())
+                .minimumCommissionBalance(request.getMinimumCommissionBalance())
                 .updatedBy(currentAdminLabel())
                 .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommissionSettingsResponse getCommissionSettings() {
+        BigDecimal fixedFee = BigDecimal.ZERO;
+        BigDecimal minBalance = BigDecimal.ZERO;
+        Boolean autoLock = false;
+        LocalDateTime updatedAt = LocalDateTime.now();
+
+        // Retrieve fixed commission fee
+        var fixedFeeSetting = systemSettingRepository.findByKey(FIXED_COMMISSION_FEE_KEY);
+        if (fixedFeeSetting.isPresent()) {
+            try {
+                fixedFee = new BigDecimal(fixedFeeSetting.get().getValue());
+            } catch (Exception ex) {
+                fixedFee = BigDecimal.ZERO;
+            }
+        }
+
+        // Retrieve minimum commission balance
+        var minBalanceSetting = systemSettingRepository.findByKey(MINIMUM_COMMISSION_BALANCE_KEY);
+        if (minBalanceSetting.isPresent()) {
+            try {
+                minBalance = new BigDecimal(minBalanceSetting.get().getValue());
+            } catch (Exception ex) {
+                minBalance = BigDecimal.ZERO;
+            }
+        }
+
+        // Retrieve auto lock enabled
+        var autoLockSetting = systemSettingRepository.findByKey(AUTO_LOCK_ENABLED_KEY);
+        if (autoLockSetting.isPresent()) {
+            autoLock = Boolean.parseBoolean(autoLockSetting.get().getValue());
+        }
+
+        return CommissionSettingsResponse.builder()
+                .fixedCommissionFee(fixedFee)
+                .minimumCommissionBalance(minBalance)
+                .autoLockEnabled(autoLock)
+                .updatedAt(updatedAt)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommissionWalletsResponse getCommissionWallets(String status, String keyword, int page, int size) {
+        BigDecimal minimumCommissionBalance = getMinimumCommissionBalance();
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(Sort.Direction.DESC, "balance"));
+
+        Page<Wallet> walletPage = walletRepository.findAll((root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Filter by computed status if provided
+            if (StringUtils.hasText(status) && !"all".equalsIgnoreCase(status)) {
+                try {
+                    WalletStatus walletStatus = parseWalletStatus(status);
+                    predicates.addAll(buildWalletStatusPredicates(cb, root, walletStatus, minimumCommissionBalance));
+                } catch (IllegalArgumentException ex) {
+                    throw AppException.badRequest(ErrorCode.BAD_REQUEST, "Trạng thái ví không hợp lệ");
+                }
+            }
+
+            // Filter by technician name (keyword)
+            if (StringUtils.hasText(keyword)) {
+                predicates.add(cb.like(cb.lower(root.get("user").get("fullName")),
+                        "%" + keyword.toLowerCase() + "%"));
+            }
+
+            // Only include technician wallets
+            predicates.add(cb.equal(root.get("user").get("role"), Role.TECHNICIAN));
+            predicates.add(cb.equal(root.get("user").get("deleted"), false));
+
+            return cb.and(predicates.toArray(Predicate[]::new));
+        }, pageable);
+
+        List<CommissionWalletsResponse.Item> items = walletPage.getContent().stream()
+                .map(wallet -> toCommissionWalletItem(wallet, minimumCommissionBalance))
+                .toList();
+
+        return CommissionWalletsResponse.builder()
+                .content(items)
+                .pagination(PagedResponse.PaginationMeta.builder()
+                        .page(page)
+                        .limit(size)
+                        .total(walletPage.getTotalElements())
+                        .totalPages(walletPage.getTotalPages())
+                        .build())
                 .build();
     }
 
@@ -233,6 +517,9 @@ public class AdminServiceImpl implements AdminService {
                 .amount(request.getAmount())
                 .fee(BigDecimal.ZERO)
                 .netAmount(request.getAmount())
+                .afterBalance(newBalance.longValueExact())
+                .note(request.getReason())
+                .actor(currentAdminLabel())
                 .status(TransactionStatus.SUCCESS)
                 .processedAt(LocalDateTime.now())
                 .build();
@@ -270,6 +557,7 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+
     private AdminStatsResponse.Metric metric(BigDecimal value, BigDecimal change) {
         return AdminStatsResponse.Metric.builder()
                 .value(value)
@@ -280,8 +568,22 @@ public class AdminServiceImpl implements AdminService {
 
     private AdminTransactionsResponse.Item toTransactionItem(WalletTransaction transaction) {
         User user = transaction.getWallet().getUser();
+        String orderCode = transaction.getOrder() != null ? transaction.getOrder().getCode() : (transaction.getRelatedOrderCode() != null ? transaction.getRelatedOrderCode() : "");
+        WalletStatus walletStatus = resolveCommissionWalletStatus(transaction.getWallet().getBalance(), getMinimumCommissionBalance());
+
         return AdminTransactionsResponse.Item.builder()
                 .id(transaction.getTransactionCode())
+                .transactionCode(transaction.getTransactionCode())
+                .transactionType(transaction.getType().apiValue())
+                .amount(transaction.getAmount())
+                .afterBalance(transaction.getAfterBalance())
+                .walletStatus(walletStatus.apiValue())
+                .technicianName(user.getFullName())
+                .orderCode(orderCode)
+                .note(transaction.getNote())
+                .actor(transaction.getActor())
+                .createdAt(transaction.getCreatedAt())
+                // Legacy fields
                 .time(transaction.getCreatedAt().format(DateTimeFormatter.ofPattern("HH:mm")))
                 .date(transaction.getCreatedAt().toLocalDate().toString())
                 .partner(AdminTransactionsResponse.Partner.builder()
@@ -289,9 +591,74 @@ public class AdminServiceImpl implements AdminService {
                         .area(String.join(", ", List.of(nullToEmpty(user.getDistrict()), nullToEmpty(user.getAddress()))).replaceAll("(^, |, $)", ""))
                         .build())
                 .type(transaction.getType().apiValue())
-                .amount(transaction.getAmount())
                 .status(transaction.getStatus() == TransactionStatus.SUCCESS ? "done" : transaction.getStatus().apiValue())
                 .build();
+    }
+
+    private CommissionWalletsResponse.Item toCommissionWalletItem(Wallet wallet, BigDecimal minimumCommissionBalance) {
+        BigDecimal totalCommissionPaid = walletTransactionRepository.sumCommissionDeductionAmount(wallet.getId());
+        totalCommissionPaid = totalCommissionPaid == null ? BigDecimal.ZERO : totalCommissionPaid.abs();
+
+        LocalDateTime lastOrderAt = walletTransactionRepository.findLastOrderActivityAt(wallet.getId());
+        WalletStatus walletStatus = resolveCommissionWalletStatus(wallet.getBalance(), minimumCommissionBalance);
+
+        return CommissionWalletsResponse.Item.builder()
+                .technicianId(wallet.getUser().getId())
+                .technicianName(wallet.getUser().getFullName())
+                .walletBalance(wallet.getBalance())
+                .walletStatus(walletStatus.apiValue())
+                .totalCommissionPaid(totalCommissionPaid)
+                .lastOrderAt(lastOrderAt)
+                .locked(walletStatus == WalletStatus.LOCKED)
+                .build();
+    }
+
+    private WalletStatus resolveCommissionWalletStatus(BigDecimal balance, BigDecimal minimumCommissionBalance) {
+        BigDecimal safeBalance = balance == null ? BigDecimal.ZERO : balance;
+        BigDecimal threshold = minimumCommissionBalance == null ? BigDecimal.ZERO : minimumCommissionBalance;
+        if (safeBalance.compareTo(BigDecimal.ZERO) <= 0) {
+            return WalletStatus.LOCKED;
+        }
+        if (safeBalance.compareTo(threshold) <= 0) {
+            return WalletStatus.LOW_BALANCE;
+        }
+        return WalletStatus.NORMAL;
+    }
+
+    private BigDecimal getMinimumCommissionBalance() {
+        return systemSettingRepository.findByKey(MINIMUM_COMMISSION_BALANCE_KEY)
+                .map(setting -> {
+                    try {
+                        return new BigDecimal(setting.getValue());
+                    } catch (Exception ex) {
+                        return BigDecimal.ZERO;
+                    }
+                })
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private WalletStatus parseWalletStatus(String value) {
+        return WalletStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
+    }
+
+    private List<Predicate> buildWalletStatusPredicates(
+            jakarta.persistence.criteria.CriteriaBuilder cb,
+            jakarta.persistence.criteria.Root<Wallet> root,
+            WalletStatus walletStatus,
+            BigDecimal minimumCommissionBalance) {
+        List<Predicate> predicates = new ArrayList<>();
+        BigDecimal safeMinimum = minimumCommissionBalance == null ? BigDecimal.ZERO : minimumCommissionBalance;
+
+        switch (walletStatus) {
+            case LOCKED -> predicates.add(cb.lessThanOrEqualTo(root.get("balance"), BigDecimal.ZERO));
+            case LOW_BALANCE -> {
+                predicates.add(cb.greaterThan(root.get("balance"), BigDecimal.ZERO));
+                predicates.add(cb.lessThanOrEqualTo(root.get("balance"), safeMinimum));
+            }
+            case NORMAL -> predicates.add(cb.greaterThan(root.get("balance"), safeMinimum));
+        }
+
+        return predicates;
     }
 
     private WithdrawRequestsResponse.Item toWithdrawItem(WalletTransaction transaction) {
@@ -325,7 +692,7 @@ public class AdminServiceImpl implements AdminService {
         }
         String normalized = range.toLowerCase(Locale.ROOT).replace("days", "");
         try {
-            return Math.min(Math.max(Integer.parseInt(normalized), 1), 90);
+                return Integer.parseInt(normalized) < 1 ? 1 : Math.min(Integer.parseInt(normalized), 90);
         } catch (NumberFormatException ex) {
             return 7;
         }
@@ -385,13 +752,20 @@ public class AdminServiceImpl implements AdminService {
         return request;
     }
 
+    private void saveSystemSetting(String key, String value) {
+        SystemSetting setting = systemSettingRepository.findByKey(key)
+                .orElse(SystemSetting.builder().key(key).build());
+        setting.setValue(value);
+        systemSettingRepository.save(setting);
+    }
+
     private String initials(String fullName) {
         if (!StringUtils.hasText(fullName)) {
             return "";
         }
         String[] words = fullName.trim().split("\\s+");
         return words.length == 1 ? words[0].substring(0, 1).toUpperCase(Locale.ROOT)
-                : (words[0].substring(0, 1) + words[words.length - 1].substring(0, 1)).toUpperCase(Locale.ROOT);
+                : (String.valueOf(words[0].charAt(0)) + words[words.length - 1].charAt(0)).toUpperCase(Locale.ROOT);
     }
 
     private String nullToEmpty(String value) {

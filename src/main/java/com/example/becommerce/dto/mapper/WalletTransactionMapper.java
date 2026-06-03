@@ -22,6 +22,10 @@ public class WalletTransactionMapper {
                 .title(transaction.getTitle())
                 .category(transaction.getCategory())
                 .amount(MoneyUtils.displayAmount(transaction.getType(), transaction.getAmount()))
+                .afterBalance(transaction.getAfterBalance())
+                .note(transaction.getNote())
+                .actor(transaction.getActor())
+                .relatedOrderCode(transaction.getRelatedOrderCode())
                 .status(transaction.getStatus().apiValue())
                 .createdAt(transaction.getCreatedAt())
                 .build();

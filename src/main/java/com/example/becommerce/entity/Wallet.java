@@ -56,6 +56,7 @@ public class Wallet {
     @Builder.Default
     private String currency = "VND";
 
+
     @Version
     private Long version;
 

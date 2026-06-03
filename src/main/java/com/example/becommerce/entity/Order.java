@@ -55,6 +55,9 @@ public class Order {
     @Column(name = "service_category", length = 120)
     private String serviceCategory;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(name = "device_name", length = 200)
     private String deviceName;
 

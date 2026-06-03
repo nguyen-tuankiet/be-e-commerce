@@ -1,3 +1,4 @@
+-- dialect: PostgreSQL
 -- GlowUp unified PostgreSQL schema
 -- Source: /home/tanluc/Downloads/glowup_schema.dbml + current Spring/JPA entities.
 -- Decision: keep BIGSERIAL primary keys and uppercase VARCHAR enums so the existing
@@ -561,7 +562,10 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   amount                 NUMERIC(19,0) NOT NULL,
   fee                    NUMERIC(19,0) NOT NULL DEFAULT 0,
   net_amount             NUMERIC(19,0) NOT NULL DEFAULT 0,
-  balance_after          NUMERIC(19,0),
+  after_balance          BIGINT,
+  note                   VARCHAR(255),
+  actor                  VARCHAR(50),
+  related_order_code     VARCHAR(100),
   status                 VARCHAR(30) NOT NULL,
   payment_method         VARCHAR(30),
   bank_account_id        BIGINT REFERENCES bank_accounts(id) ON DELETE SET NULL,

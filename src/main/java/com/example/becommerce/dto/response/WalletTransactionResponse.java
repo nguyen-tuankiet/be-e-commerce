@@ -20,6 +20,10 @@ public class WalletTransactionResponse {
     private String title;
     private String category;
     private BigDecimal amount;
+    private Long afterBalance;
+    private String note;
+    private String actor;
+    private String relatedOrderCode;
     private String status;
     private LocalDateTime createdAt;
 }

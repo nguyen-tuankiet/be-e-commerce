@@ -45,4 +45,8 @@ public interface OrderService {
     OrderStatusChangeResponse completeOrder(String code, CompleteOrderRequest request);
 
     PriceAdjustmentEnvelope requestPriceAdjustment(String code, PriceAdjustmentRequest request);
+
+    // ---- Payment flow --------------------------------------------------
+
+    void createPaymentTransactionForOrder(Long orderId);
 }

@@ -25,6 +25,7 @@ import com.example.becommerce.entity.WalletTransaction;
 import com.example.becommerce.entity.enums.PaymentMethod;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
+import com.example.becommerce.entity.enums.WalletStatus;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.BankAccountRepository;
 import com.example.becommerce.repository.UserRepository;
@@ -66,7 +67,6 @@ public class WalletServiceImpl implements WalletService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final BankAccountRepository bankAccountRepository;
     private final UserRepository userRepository;
-    private final WalletMapper walletMapper;
     private final WalletTransactionMapper walletTransactionMapper;
     private final BankAccountMapper bankAccountMapper;
     private final TransactionCodeGenerator transactionCodeGenerator;
@@ -92,7 +92,7 @@ public class WalletServiceImpl implements WalletService {
     public WalletResponse getCurrentWallet() {
         User currentUser = getCurrentUser();
         Wallet wallet = getOrCreateWallet(currentUser);
-        return walletMapper.toResponse(wallet);
+        return buildWalletResponse(wallet);
     }
 
     @Override
@@ -149,6 +149,8 @@ public class WalletServiceImpl implements WalletService {
                 .amount(amount)
                 .fee(BigDecimal.ZERO)
                 .netAmount(amount)
+                .note("Chờ xác nhận thanh toán")
+                .actor("USER")
                 .status(TransactionStatus.AWAITING_PAYMENT)
                 .paymentMethod(paymentMethod)
                 .transferContent(null)
@@ -238,6 +240,9 @@ public class WalletServiceImpl implements WalletService {
                 .amount(amount)
                 .fee(withdrawFee)
                 .netAmount(netAmount)
+                .afterBalance(wallet.getBalance().subtract(amount).longValueExact())
+                .note("Yêu cầu rút tiền về tài khoản ngân hàng")
+                .actor(currentUser.getRole().name())
                 .status(TransactionStatus.PENDING)
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .bankAccount(bankAccount)
@@ -363,6 +368,23 @@ public class WalletServiceImpl implements WalletService {
                                 .orElseThrow(() -> AppException.notFound("Không thể khởi tạo ví cho người dùng"));
                     }
                 });
+    }
+
+    private WalletResponse buildWalletResponse(Wallet wallet) {
+        return WalletResponse.builder()
+                .userId(wallet.getUser() != null ? wallet.getUser().getCode() : null)
+                .balance(wallet.getBalance())
+                .status(resolveWalletStatus(wallet.getBalance()).apiValue())
+                .pendingBalance(wallet.getPendingBalance())
+                .totalEarned(wallet.getTotalEarned())
+                .totalWithdrawn(wallet.getTotalWithdrawn())
+                .currency(wallet.getCurrency())
+                .updatedAt(wallet.getUpdatedAt())
+                .build();
+    }
+
+    private WalletStatus resolveWalletStatus(BigDecimal balance) {
+        return WalletStatus.fromBalance(balance);
     }
 
     private void ensureTopUpTransactionCanBeConfirmed(WalletTransaction transaction) {

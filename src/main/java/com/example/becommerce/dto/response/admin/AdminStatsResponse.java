@@ -11,7 +11,7 @@ public class AdminStatsResponse {
     private final Metric totalRevenue;
     private final Metric totalProfit;
     private final Metric activeTechnicians;
-    private final Metric ordersToday;
+    private final Metric totalOrders;
 
     @Getter
     @Builder
