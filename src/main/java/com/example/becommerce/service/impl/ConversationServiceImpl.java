@@ -14,6 +14,7 @@ import com.example.becommerce.entity.Message;
 import com.example.becommerce.entity.Order;
 import com.example.becommerce.entity.User;
 import com.example.becommerce.entity.enums.MessageType;
+import com.example.becommerce.entity.enums.NotificationType;
 import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.ConversationRepository;
@@ -21,6 +22,7 @@ import com.example.becommerce.repository.MessageRepository;
 import com.example.becommerce.repository.OrderRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.service.ConversationService;
+import com.example.becommerce.service.NotificationService;
 import com.example.becommerce.service.WsEventPublisher;
 import com.example.becommerce.utils.ConversationCodeGenerator;
 import com.example.becommerce.utils.MessageCodeGenerator;
@@ -36,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Business rules for chat:
@@ -61,6 +65,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationCodeGenerator   conversationCodeGenerator;
     private final MessageCodeGenerator        messageCodeGenerator;
     private final WsEventPublisher            eventPublisher;
+    private final NotificationService         notificationService;
 
     // ===============================================================
     // LIST CONVERSATIONS
@@ -83,9 +88,10 @@ public class ConversationServiceImpl implements ConversationService {
                             .findTopByConversation_IdOrderBySentAtDesc(c.getId())
                             .orElse(null);
                     LocalDateTime watermark = readWatermark(c, viewer);
-                    long unread = messageRepository.countUnread(c.getId(), viewer.getId(), watermark);
+                    long unread = countUnreadForParticipant(c.getId(), viewer.getId(), watermark);
                     return conversationMapper.toListItem(c, viewer, last, unread);
                 })
+                .filter(item -> item != null && item.getPartner() != null)
                 .toList();
 
         return PagedResponse.of(items, page, limit, convPage.getTotalElements());
@@ -110,13 +116,15 @@ public class ConversationServiceImpl implements ConversationService {
                     "Tài khoản đối tác không phải là thợ");
         }
 
-        Conversation conversation = conversationRepository
-                .findByCustomer_IdAndTechnician_Id(customer.getId(), technician.getId())
-                .orElseGet(() -> Conversation.builder()
-                        .code(conversationCodeGenerator.generate())
-                        .customer(customer)
-                        .technician(technician)
-                        .build());
+        Optional<Conversation> existing = conversationRepository
+                .findByCustomer_IdAndTechnician_Id(customer.getId(), technician.getId());
+        boolean isNewConversation = existing.isEmpty();
+
+        Conversation conversation = existing.orElseGet(() -> Conversation.builder()
+                .code(conversationCodeGenerator.generate())
+                .customer(customer)
+                .technician(technician)
+                .build());
 
         if (request.getOrderId() != null && !request.getOrderId().isBlank()) {
             Order order = orderRepository.findByCodeAndDeletedFalse(request.getOrderId())
@@ -129,7 +137,16 @@ public class ConversationServiceImpl implements ConversationService {
                 saved.getCode(), customer.getCode(), technician.getCode(),
                 saved.getOrder() == null ? "-" : saved.getOrder().getCode());
 
-        return conversationMapper.toCreatedResponse(saved);
+        if (isNewConversation) {
+            notifyChatRecipient(
+                    technician,
+                    customer.getFullName(),
+                    "Khách hàng mới muốn trò chuyện",
+                    customer.getFullName() + " đã mở cuộc trò chuyện với bạn.",
+                    saved);
+        }
+
+        return conversationMapper.toCreatedResponse(saved, customer);
     }
 
     // ===============================================================
@@ -204,12 +221,53 @@ public class ConversationServiceImpl implements ConversationService {
 
         MessageResponse response = messageMapper.toResponse(saved, sender, readWatermark(conversation, sender));
         eventPublisher.publishMessageNew(conversation.getCode(), response);
+
+        User recipient = conversationMapper.partnerOf(conversation, sender);
+        if (recipient != null) {
+            String preview = request.getContent() == null ? "" : request.getContent().trim();
+            if (preview.length() > 120) {
+                preview = preview.substring(0, 117) + "...";
+            }
+            notifyChatRecipient(
+                    recipient,
+                    sender.getFullName(),
+                    "Tin nhắn mới từ " + sender.getFullName(),
+                    preview.isBlank() ? "Bạn có tin nhắn mới" : preview,
+                    conversation);
+        }
+
         return response;
     }
 
     // ===============================================================
     // Helpers
     // ===============================================================
+
+    private void notifyChatRecipient(User recipient, String senderName, String title, String body,
+                                     Conversation conversation) {
+        try {
+            notificationService.createNotification(
+                    recipient,
+                    NotificationType.CHAT_MESSAGE,
+                    title,
+                    body,
+                    Map.of(
+                            "conversationId", conversation.getCode(),
+                            "senderName", senderName,
+                            "orderId", conversation.getOrder() == null
+                                    ? ""
+                                    : conversation.getOrder().getCode()));
+        } catch (Exception ex) {
+            log.warn("Failed to push chat notification to {}: {}", recipient.getCode(), ex.getMessage());
+        }
+    }
+
+    private long countUnreadForParticipant(Long conversationId, Long userId, LocalDateTime watermark) {
+        if (watermark == null) {
+            return messageRepository.countUnreadAll(conversationId, userId);
+        }
+        return messageRepository.countUnreadSince(conversationId, userId, watermark);
+    }
 
     private LocalDateTime readWatermark(Conversation conversation, User user) {
         if (conversation.getCustomer() != null && conversation.getCustomer().getId().equals(user.getId())) {

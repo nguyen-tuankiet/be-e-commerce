@@ -111,12 +111,14 @@ public class OrderMapper {
                 .map(this::toPartResponse)
                 .toList();
 
+        List<String> evidence = adj.getEvidenceImages();
         return OrderPriceAdjustmentResponse.builder()
                 .originalPrice(adj.getOriginalPrice())
                 .newPrice(adj.getNewPrice())
                 .reason(adj.getReason())
                 .status(adj.getStatus() == null ? null : adj.getStatus().apiValue())
                 .parts(parts.isEmpty() ? null : parts)
+                .evidenceImages(evidence == null || evidence.isEmpty() ? null : evidence)
                 .requestedAt(adj.getRequestedAt())
                 .approvedAt(adj.getApprovedAt())
                 .rejectedAt(adj.getRejectedAt())

@@ -72,7 +72,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 // WebSocket handshake — STOMP CONNECT carries its own JWT (see WebSocketAuthInterceptor).
-                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/ws/**", "/ws-stomp", "/ws-stomp/**").permitAll()
 
                 // Admin-only
                 .requestMatchers("/api/admin/**").hasRole(RoleConstant.ADMIN)

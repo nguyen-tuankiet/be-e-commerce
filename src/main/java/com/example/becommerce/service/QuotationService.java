@@ -11,4 +11,7 @@ public interface QuotationService {
 
     /** Customer accepts the quote; spawns a scheduled Order linked back to the quote. */
     AcceptQuotationResponse acceptQuotation(String quotationCode);
+
+    /** Customer rejects a pending quote. */
+    QuotationResponse rejectQuotation(String quotationCode);
 }

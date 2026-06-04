@@ -23,8 +23,15 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     Optional<Conversation> findByCustomer_IdAndTechnician_Id(Long customerId, Long technicianId);
 
     /** All conversations where the given user is either the customer or the technician. */
-    @Query("""
+    @Query(value = """
             SELECT c FROM Conversation c
+            LEFT JOIN FETCH c.customer
+            LEFT JOIN FETCH c.technician
+            LEFT JOIN FETCH c.order
+            WHERE c.customer.id = :userId OR c.technician.id = :userId
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Conversation c
             WHERE c.customer.id = :userId OR c.technician.id = :userId
             """)
     Page<Conversation> findAllForUser(@Param("userId") Long userId, Pageable pageable);

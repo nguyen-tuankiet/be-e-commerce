@@ -2,6 +2,7 @@ package com.example.becommerce.controller;
 
 import com.example.becommerce.dto.response.ApiResponse;
 import com.example.becommerce.dto.response.quotation.AcceptQuotationResponse;
+import com.example.becommerce.dto.response.quotation.QuotationResponse;
 import com.example.becommerce.service.QuotationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,5 +26,11 @@ public class QuotationController {
     public ResponseEntity<ApiResponse<AcceptQuotationResponse>> accept(
             @PathVariable("id") String quotationCode) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.acceptQuotation(quotationCode)));
+    }
+
+    @PatchMapping("/{id}/reject")
+    public ResponseEntity<ApiResponse<QuotationResponse>> reject(
+            @PathVariable("id") String quotationCode) {
+        return ResponseEntity.ok(ApiResponse.success(quotationService.rejectQuotation(quotationCode)));
     }
 }

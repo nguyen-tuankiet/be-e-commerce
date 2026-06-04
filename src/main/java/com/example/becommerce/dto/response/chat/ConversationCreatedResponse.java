@@ -14,6 +14,7 @@ public class ConversationCreatedResponse {
 
     private String id;
     private String orderId;
+    private ChatPartnerSummary partner;
     private List<String> participants;
     private LocalDateTime createdAt;
 }
