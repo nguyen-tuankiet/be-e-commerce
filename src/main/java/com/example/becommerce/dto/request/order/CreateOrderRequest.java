@@ -39,4 +39,6 @@ public class CreateOrderRequest {
     private String subService;
 
     private List<String> images;
+
+    private String technicianId;
 }

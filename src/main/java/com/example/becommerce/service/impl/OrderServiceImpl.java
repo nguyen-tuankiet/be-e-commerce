@@ -136,9 +136,19 @@ public class OrderServiceImpl implements OrderService {
             throw AppException.forbidden("Chỉ khách hàng mới được tạo đơn");
         }
 
+        User technician = null;
+        if (request.getTechnicianId() != null && !request.getTechnicianId().isBlank()) {
+            technician = userRepository.findByCodeAndDeletedFalse(request.getTechnicianId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy kỹ thuật viên " + request.getTechnicianId()));
+            if (technician.getRole() != Role.TECHNICIAN) {
+                throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, "Tài khoản không phải kỹ thuật viên");
+            }
+        }
+
         Order order = Order.builder()
                 .code(codeGenerator.generate())
                 .customer(customer)
+                .technician(technician)
                 .deviceName(request.getDeviceName())
                 .description(request.getDescription())
                 .address(request.getAddress())
