@@ -230,6 +230,7 @@ public class WalletServiceImpl implements WalletService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản ngân hàng"));
 
         BigDecimal netAmount = amount.subtract(withdrawFee);
+        wallet.normalizeForPersistence();
         wallet.setPersonalBalance(personalBalance.subtract(amount));
         wallet.setPendingBalance(wallet.getPendingBalance().add(netAmount));
         wallet.setTotalWithdrawn(wallet.getTotalWithdrawn().add(amount));
@@ -342,7 +343,7 @@ public class WalletServiceImpl implements WalletService {
                 wallet -> log.debug("Wallet already exists for user {}", user.getCode()),
                 () -> {
                     try {
-                        walletRepository.save(Wallet.builder()
+                        Wallet wallet = Wallet.builder()
                                 .user(user)
                                 .balance(BigDecimal.ZERO)
                                 .pendingBalance(BigDecimal.ZERO)
@@ -350,7 +351,9 @@ public class WalletServiceImpl implements WalletService {
                                 .totalEarned(BigDecimal.ZERO)
                                 .totalWithdrawn(BigDecimal.ZERO)
                                 .currency(defaultCurrency)
-                                .build());
+                                .build();
+                        wallet.normalizeForPersistence();
+                        walletRepository.save(wallet);
                     } catch (DataIntegrityViolationException ex) {
                         log.debug("Wallet race detected for user {}, reloading existing wallet", user.getCode());
                     }
@@ -362,7 +365,7 @@ public class WalletServiceImpl implements WalletService {
         return walletRepository.findByUser_Id(user.getId())
                 .orElseGet(() -> {
                     try {
-                        return walletRepository.save(Wallet.builder()
+                        Wallet wallet = Wallet.builder()
                                 .user(user)
                                 .balance(BigDecimal.ZERO)
                                 .pendingBalance(BigDecimal.ZERO)
@@ -370,7 +373,9 @@ public class WalletServiceImpl implements WalletService {
                                 .totalEarned(BigDecimal.ZERO)
                                 .totalWithdrawn(BigDecimal.ZERO)
                                 .currency(defaultCurrency)
-                                .build());
+                                .build();
+                        wallet.normalizeForPersistence();
+                        return walletRepository.save(wallet);
                     } catch (DataIntegrityViolationException ex) {
                         return walletRepository.findByUser_Id(user.getId())
                                 .orElseThrow(() -> AppException.notFound("Không thể khởi tạo ví cho người dùng"));
@@ -458,6 +463,5 @@ public class WalletServiceImpl implements WalletService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng hiện tại"));
     }
 }
-
 
 

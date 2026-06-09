@@ -138,6 +138,7 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
     private void confirmTopupAndCreditWallet(WalletTransaction tx) {
         Wallet wallet = walletRepository.findWithLockByUser_Id(tx.getWallet().getUser().getId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy ví"));
+        wallet.normalizeForPersistence();
         wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
         wallet.setTotalEarned(wallet.getTotalEarned().add(tx.getAmount()));
         walletRepository.save(wallet);
@@ -178,7 +179,6 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
         }
     }
 }
-
 
 
 

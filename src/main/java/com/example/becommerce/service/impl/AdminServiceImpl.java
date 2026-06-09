@@ -378,6 +378,7 @@ public class AdminServiceImpl implements AdminService {
 
         Wallet wallet = walletRepository.findWithLockByUser_Id(transaction.getWallet().getUser().getId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy ví"));
+        wallet.normalizeForPersistence();
         wallet.setPendingBalance(wallet.getPendingBalance().subtract(transaction.getNetAmount()));
         walletRepository.save(wallet);
 
@@ -511,6 +512,7 @@ public class AdminServiceImpl implements AdminService {
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
             throw AppException.badRequest(ErrorCode.INSUFFICIENT_BALANCE, "Số dư ví không đủ để điều chỉnh");
         }
+        wallet.normalizeForPersistence();
         wallet.setBalance(newBalance);
         walletRepository.save(wallet);
 

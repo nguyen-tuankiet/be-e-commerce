@@ -469,6 +469,7 @@ public class OrderServiceImpl implements OrderService {
         walletTransactionRepository.save(commissionTransaction);
 
         // Update wallet balance with commission deduction
+        wallet.normalizeForPersistence();
         wallet.setBalance(creditBalanceAfterDeduction.max(BigDecimal.ZERO));
         walletRepository.save(wallet);
     }
@@ -783,6 +784,7 @@ public class OrderServiceImpl implements OrderService {
         walletTransactionRepository.save(transaction);
         
         // 4. Update wallet balance
+        wallet.normalizeForPersistence();
         wallet.setBalance(wallet.getBalance().add(transaction.getNetAmount()));
         walletRepository.save(wallet);
         
