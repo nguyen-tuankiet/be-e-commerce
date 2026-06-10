@@ -17,6 +17,7 @@ public class OrderPriceAdjustmentResponse {
     private String reason;
     private String status;
     private List<Part> parts;
+    private List<String> evidenceImages;
     private LocalDateTime requestedAt;
     private LocalDateTime approvedAt;
     private LocalDateTime rejectedAt;

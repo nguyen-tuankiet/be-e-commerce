@@ -27,6 +27,7 @@ import com.example.becommerce.entity.enums.PriceAdjustmentStatus;
 import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
+import com.example.becommerce.entity.enums.WalletType;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.OrderPriceAdjustmentRepository;
 import com.example.becommerce.repository.OrderRepository;
@@ -136,9 +137,19 @@ public class OrderServiceImpl implements OrderService {
             throw AppException.forbidden("Chỉ khách hàng mới được tạo đơn");
         }
 
+        User technician = null;
+        if (request.getTechnicianId() != null && !request.getTechnicianId().isBlank()) {
+            technician = userRepository.findByCodeAndDeletedFalse(request.getTechnicianId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy kỹ thuật viên " + request.getTechnicianId()));
+            if (technician.getRole() != Role.TECHNICIAN) {
+                throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, "Tài khoản không phải kỹ thuật viên");
+            }
+        }
+
         Order order = Order.builder()
                 .code(codeGenerator.generate())
                 .customer(customer)
+                .technician(technician)
                 .deviceName(request.getDeviceName())
                 .description(request.getDescription())
                 .address(request.getAddress())
@@ -215,8 +226,9 @@ public class OrderServiceImpl implements OrderService {
         if (wallet == null) {
             throw AppException.badRequest(ErrorCode.BAD_REQUEST, "Không tìm thấy ví hoa hồng của kỹ thuật viên");
         }
-        if (wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
-            throw AppException.forbidden("Ví hoa hồng đang bị khóa do số dư thấp, không thể nhận đơn");
+        BigDecimal minimumCommissionBalance = getMinimumCommissionBalance();
+        if (wallet.getBalance().compareTo(minimumCommissionBalance) < 0) {
+            throw AppException.forbidden("Ví tín dụng chưa đạt số dư tối thiểu theo cấu hình admin, không thể nhận đơn");
         }
         if (order.getStatus() != OrderStatus.NEW) {
             throw AppException.conflict(ErrorCode.ORDER_ALREADY_TAKEN, "Đơn này đã có thợ nhận hoặc không còn nhận được");
@@ -402,6 +414,8 @@ public class OrderServiceImpl implements OrderService {
         Wallet wallet = walletRepository.findWithLockByUser_Id(technician.getId())
                 .orElseGet(() -> walletRepository.save(Wallet.builder()
                         .user(technician)
+                        .balance(BigDecimal.ZERO)
+                        .personalBalance(BigDecimal.ZERO)
                         .currency("VND")
                         .build()));
 
@@ -409,18 +423,19 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal commissionFee = getFixedCommissionFee();
 
         // Record revenue addition transaction
-        BigDecimal balanceAfterRevenue = wallet.getBalance().add(finalPrice);
+        BigDecimal personalBalanceAfterRevenue = safePersonalBalance(wallet).add(finalPrice);
         WalletTransaction revenueTransaction = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
                 .wallet(wallet)
                 .order(order)
                 .type(TransactionType.COMMISSION)
+                .walletType(WalletType.PERSONAL)
                 .category("REVENUE")
                 .title("Thu nhập đơn hoàn thành")
                 .amount(finalPrice)
                 .fee(BigDecimal.ZERO)
                 .netAmount(finalPrice)
-                .afterBalance(balanceAfterRevenue.longValueExact())
+                .afterBalance(personalBalanceAfterRevenue.longValueExact())
                 .note("Cộng " + finalPrice + " từ đơn " + order.getCode())
                 .actor("SYSTEM")
                 .status(TransactionStatus.SUCCESS)
@@ -429,22 +444,23 @@ public class OrderServiceImpl implements OrderService {
         walletTransactionRepository.save(revenueTransaction);
 
         // Update wallet balance with revenue
-        wallet.setBalance(balanceAfterRevenue);
+        wallet.setPersonalBalance(personalBalanceAfterRevenue);
         wallet.setTotalEarned(wallet.getTotalEarned().add(finalPrice));
 
         // Record commission deduction transaction
-        BigDecimal balanceAfterDeduction = balanceAfterRevenue.subtract(commissionFee);
+        BigDecimal creditBalanceAfterDeduction = wallet.getBalance().subtract(commissionFee);
         WalletTransaction commissionTransaction = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
                 .wallet(wallet)
                 .order(order)
                 .type(TransactionType.COMMISSION)
+                .walletType(WalletType.CREDIT)
                 .category("COMMISSION_DEDUCTION")
                 .title("Trừ phí hoa hồng")
                 .amount(commissionFee.negate())
                 .fee(BigDecimal.ZERO)
                 .netAmount(commissionFee.negate())
-                .afterBalance(Math.max(0, balanceAfterDeduction.longValueExact()))
+                .afterBalance(Math.max(0, creditBalanceAfterDeduction.longValueExact()))
                 .note("Trừ phí hoa hồng cho đơn " + order.getCode())
                 .actor("SYSTEM")
                 .status(TransactionStatus.SUCCESS)
@@ -453,7 +469,8 @@ public class OrderServiceImpl implements OrderService {
         walletTransactionRepository.save(commissionTransaction);
 
         // Update wallet balance with commission deduction
-        wallet.setBalance(balanceAfterDeduction.max(BigDecimal.ZERO));
+        wallet.normalizeForPersistence();
+        wallet.setBalance(creditBalanceAfterDeduction.max(BigDecimal.ZERO));
         walletRepository.save(wallet);
     }
 
@@ -479,6 +496,10 @@ public class OrderServiceImpl implements OrderService {
                     }
                 })
                 .orElse(new BigDecimal("0"));
+    }
+
+    private BigDecimal safePersonalBalance(Wallet wallet) {
+        return wallet.getPersonalBalance() == null ? BigDecimal.ZERO : wallet.getPersonalBalance();
     }
 
     @Transactional
@@ -745,6 +766,7 @@ public class OrderServiceImpl implements OrderService {
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.PAYMENT))
                 .wallet(wallet)
                 .type(TransactionType.PAYMENT)
+                .walletType(WalletType.PERSONAL)
                 .category("PAYMENT")
                 .title("Thanh toán đơn hàng " + order.getCode())
                 .amount(finalPrice)
@@ -762,6 +784,7 @@ public class OrderServiceImpl implements OrderService {
         walletTransactionRepository.save(transaction);
         
         // 4. Update wallet balance
+        wallet.normalizeForPersistence();
         wallet.setBalance(wallet.getBalance().add(transaction.getNetAmount()));
         walletRepository.save(wallet);
         

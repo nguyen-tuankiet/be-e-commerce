@@ -8,8 +8,8 @@
 --   spring.sql.init.mode: always
 --
 -- Tất cả user trong file này dùng password DEMO: "password"
--- BCrypt hash dưới đây = $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
--- (đây là hash chính thức trong Spring Security docs encode "password")
+-- BCrypt hash dưới đây = $2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm
+-- (đã verify bcrypt.checkpw("password") == True)
 --
 -- Login mẫu sau khi seed:
 --   admin@glowup.vn  / password   (role: admin)
@@ -27,28 +27,28 @@
 INSERT INTO users (code, full_name, email, phone, password, role, status, district, address, bio, avatar, deleted, created_at, updated_at)
 VALUES
 ('USR-001', 'Quản trị viên', 'admin@glowup.vn', '0900000000',
- '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+ '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm',
  'ADMIN', 'ACTIVE', 'Quận 1', '123 Lê Lợi, Quận 1', NULL,
  'https://i.pravatar.cc/150?img=68', FALSE, NOW(), NOW()),
 
 ('USR-002', 'Trần Thị Lan', 'lan@email.com', '0901234567',
- '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+ '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm',
  'CUSTOMER', 'ACTIVE', 'Quận 7', '123 Nguyễn Văn Linh, Quận 7', NULL,
  'https://i.pravatar.cc/150?img=5', FALSE, NOW(), NOW()),
 
 ('USR-003', 'Phạm Hoàng', 'hoang@email.com', '0901234568',
- '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+ '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm',
  'CUSTOMER', 'ACTIVE', 'Quận 3', '45 Võ Văn Tần, Quận 3', NULL,
  'https://i.pravatar.cc/150?img=12', FALSE, NOW(), NOW()),
 
 ('USR-004', 'Trần Anh Tuấn', 'tuan@glowup.pro', '0987654321',
- '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+ '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm',
  'TECHNICIAN', 'ACTIVE', 'Quận 1', '25 Bis Nguyễn Thị Minh Khai, Quận 1',
  'Hơn 10 năm kinh nghiệm sửa điện lạnh, bảo trì máy lạnh, hệ thống thông gió.',
  'https://i.pravatar.cc/150?img=33', FALSE, NOW(), NOW()),
 
 ('USR-005', 'Nguyễn Văn Minh', 'minh@glowup.pro', '0987654322',
- '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+ '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm',
  'TECHNICIAN', 'ACTIVE', 'Quận Bình Thạnh', '78 Đinh Bộ Lĩnh, Bình Thạnh',
  'Chuyên sửa máy giặt cửa ngang, tủ lạnh inverter các hãng.',
  'https://i.pravatar.cc/150?img=13', FALSE, NOW(), NOW())
@@ -254,7 +254,7 @@ SELECT 'USR-T-' || LPAD(s::text,3,'0') AS code,
        'Kỹ thuật viên ' || s AS full_name,
        'tech' || s || '@example.com' AS email,
        ('0900' || LPAD(s::text,4,'0')) AS phone,
-       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' AS password,
+       '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm' AS password,
        'TECHNICIAN' AS role,
        'ACTIVE' AS status,
        'Quận 1' AS district,
@@ -271,7 +271,7 @@ SELECT 'USR-C-' || LPAD(s::text,3,'0') AS code,
        'Khách hàng ' || s AS full_name,
        'cust' || s || '@example.com' AS email,
        ('0910' || LPAD(s::text,4,'0')) AS phone,
-       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' AS password,
+       '$2a$10$v7D/LWQ3B1QEhFUKA9tCP.9U.xWWiDv92EL7pSQnkPXUIB51i0Mwm' AS password,
        'CUSTOMER' AS role,
        'ACTIVE' AS status,
        'Quận 7' AS district,
@@ -285,51 +285,75 @@ ON CONFLICT (code) DO NOTHING;
 -- 3.5) Commission wallet demo data (status is computed dynamically)
 INSERT INTO wallets (
     user_id,
-    balance,
-    pending_balance,
     total_earned,
     total_withdrawn,
     currency,
     created_at,
     updated_at
 )
-SELECT u.id, 70000, 0, 70000, 0, 'VND', NOW(), NOW()
-FROM users u WHERE u.code = 'USR-004'
-ON CONFLICT (user_id) DO NOTHING;
+SELECT
+    u.id,
+    70000,
+    0,
+    70000,  -- credit_balance
+    0,      -- personal_balance
+    0,      -- pending_withdraw_balance
+    'VND',
+    NOW(),
+    NOW()
+FROM users u
+WHERE u.code = 'USR-004'
+    ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallets (
     user_id,
-    balance,
-    pending_balance,
     total_earned,
     total_withdrawn,
     currency,
     created_at,
     updated_at
 )
-SELECT u.id, 15000, 0, 35000, 20000, 'VND', NOW(), NOW()
-FROM users u WHERE u.code = 'USR-005'
-ON CONFLICT (user_id) DO NOTHING;
+SELECT
+    u.id,
+    35000,
+    20000,
+    15000,  -- credit_balance
+    0,      -- personal_balance
+    0,      -- pending_withdraw_balance
+    'VND',
+    NOW(),
+    NOW()
+FROM users u
+WHERE u.code = 'USR-005'
+    ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallets (
     user_id,
-    balance,
-    pending_balance,
     total_earned,
     total_withdrawn,
     currency,
     created_at,
     updated_at
 )
-SELECT u.id, 0, 0, 15000, 15000, 'VND', NOW(), NOW()
-FROM users u WHERE u.code = 'USR-T-001'
-ON CONFLICT (user_id) DO NOTHING;
+SELECT
+    u.id,
+    15000,
+    15000,
+    0,      -- credit_balance
+    0,      -- personal_balance
+    0,      -- pending_withdraw_balance
+    'VND',
+    NOW(),
+    NOW()
+FROM users u
+WHERE u.code = 'USR-T-001'
+    ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO wallet_transactions (
-  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  transaction_code, wallet_id, type, wallet_type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-001', w.id, 'COMMISSION', 'COMMISSION_TOPUP', 'Nạp hoa hồng cho thợ',
+SELECT 'TX-COMM-001', w.id, 'COMMISSION', 'CREDIT', 'COMMISSION_TOPUP', 'Nạp hoa hồng cho thợ',
        70000, 0, 70000, 70000,
        'Nạp quỹ hoa hồng khởi tạo', 'ADMIN', NULL,
        'SUCCESS', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'
@@ -339,10 +363,10 @@ WHERE u.code = 'USR-004'
   AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-001');
 
 INSERT INTO wallet_transactions (
-  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  transaction_code, wallet_id, type, wallet_type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-002', w.id, 'COMMISSION', 'COMMISSION_TOPUP', 'Nạp thêm hoa hồng cho thợ Minh',
+SELECT 'TX-COMM-002', w.id, 'COMMISSION', 'CREDIT', 'COMMISSION_TOPUP', 'Nạp thêm hoa hồng cho thợ Minh',
        35000, 0, 35000, 35000,
        'Nạp quỹ để demo trạng thái LOW_BALANCE sau khi khấu trừ', 'ADMIN', 'GU-SEED-002',
        'SUCCESS', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
@@ -352,10 +376,10 @@ WHERE u.code = 'USR-005'
   AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-002');
 
 INSERT INTO wallet_transactions (
-  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  transaction_code, wallet_id, type, wallet_type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-003', w.id, 'COMMISSION', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng đơn GU-99210',
+SELECT 'TX-COMM-003', w.id, 'COMMISSION', 'CREDIT', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng đơn GU-99210',
        20000, 0, -20000, 15000,
        'Khấu trừ phí cố định theo đơn hoàn thành', 'SYSTEM', 'GU-99210',
        'SUCCESS', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
@@ -365,10 +389,10 @@ WHERE u.code = 'USR-005'
   AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-003');
 
 INSERT INTO wallet_transactions (
-  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  transaction_code, wallet_id, type, wallet_type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-004', w.id, 'COMMISSION', 'COMMISSION_TOPUP', 'Nạp hoa hồng khởi tạo cho thợ LOCKED demo',
+SELECT 'TX-COMM-004', w.id, 'COMMISSION', 'CREDIT', 'COMMISSION_TOPUP', 'Nạp hoa hồng khởi tạo cho thợ LOCKED demo',
        15000, 0, 15000, 15000,
        'Tạo lịch sử để kiểm thử lastOrderAt và status LOCKED', 'ADMIN', 'GU-SEED-LOCK-001',
        'SUCCESS', NOW() - INTERVAL '12 hours', NOW() - INTERVAL '12 hours'
@@ -378,10 +402,10 @@ WHERE u.code = 'USR-T-001'
   AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.transaction_code = 'TX-COMM-004');
 
 INSERT INTO wallet_transactions (
-  transaction_code, wallet_id, type, category, title, amount, fee, net_amount,
+  transaction_code, wallet_id, type, wallet_type, category, title, amount, fee, net_amount,
   after_balance, note, actor, related_order_code, status, created_at, processed_at
 )
-SELECT 'TX-COMM-005', w.id, 'COMMISSION', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng về 0',
+SELECT 'TX-COMM-005', w.id, 'COMMISSION', 'CREDIT', 'COMMISSION_DEDUCTION', 'Khấu trừ hoa hồng về 0',
        15000, 0, -15000, 0,
        'Đưa ví về trạng thái LOCKED theo balance = 0', 'SYSTEM', 'GU-SEED-LOCK-001',
        'SUCCESS', NOW() - INTERVAL '11 hours', NOW() - INTERVAL '11 hours'

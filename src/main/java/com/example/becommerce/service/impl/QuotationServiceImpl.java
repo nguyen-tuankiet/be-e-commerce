@@ -189,6 +189,37 @@ public class QuotationServiceImpl implements QuotationService {
         return quotationMapper.toAcceptResponse(savedQuote);
     }
 
+    // ===============================================================
+    // REJECT QUOTE
+    // ===============================================================
+
+    @Override
+    @Transactional
+    public QuotationResponse rejectQuotation(String quotationCode) {
+        Quotation quotation = quotationRepository.findByCode(quotationCode)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo giá " + quotationCode));
+
+        Conversation conversation = quotation.getConversation();
+        User customer = getCurrentUser();
+
+        if (customer.getRole() != Role.CUSTOMER
+                || conversation.getCustomer() == null
+                || !conversation.getCustomer().getId().equals(customer.getId())) {
+            throw AppException.forbidden("Chỉ khách hàng của cuộc trò chuyện mới có thể từ chối báo giá");
+        }
+        if (quotation.getStatus() != QuotationStatus.PENDING) {
+            throw AppException.badRequest(ErrorCode.QUOTATION_NOT_PENDING,
+                    "Báo giá không còn ở trạng thái chờ duyệt");
+        }
+
+        quotation.setStatus(QuotationStatus.REJECTED);
+        quotation.setRejectedAt(LocalDateTime.now());
+        Quotation savedQuote = quotationRepository.save(quotation);
+
+        log.info("Quotation {} rejected by customer {}", savedQuote.getCode(), customer.getCode());
+        return quotationMapper.toResponse(savedQuote);
+    }
+
     // ----------------------------------------------------------------
 
     private Conversation findConversation(String code) {

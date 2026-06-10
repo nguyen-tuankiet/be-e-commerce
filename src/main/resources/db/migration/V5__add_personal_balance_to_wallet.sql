@@ -1,0 +1,2 @@
+ALTER TABLE wallets
+    ADD COLUMN IF NOT EXISTS personal_balance NUMERIC(19,0) NOT NULL DEFAULT 0;

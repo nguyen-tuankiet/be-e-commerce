@@ -29,7 +29,7 @@ spring:
   sql:
     init:
       # Load src/main/resources/data.sql every startup (idempotent via ON CONFLICT).
-      mode: always
+      mode: never
       continue-on-error: false
 
   mail:
@@ -80,8 +80,8 @@ app:
     base-dir: ${UPLOAD_BASE_DIR:uploads}
     public-url: ${UPLOAD_PUBLIC_URL:/uploads}
 
-logging:
-  level:
-    com.example.becommerce: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
+#logging:
+#  level:
+#    com.example.becommerce: DEBUG
+#    org.springframework.security: DEBUG
+#    org.hibernate.SQL: DEBUG

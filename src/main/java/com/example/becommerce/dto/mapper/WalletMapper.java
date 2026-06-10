@@ -5,6 +5,8 @@ import com.example.becommerce.entity.Wallet;
 import com.example.becommerce.entity.enums.WalletStatus;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+
 /**
  * Maps Wallet entities to API responses.
  */
@@ -19,6 +21,8 @@ public class WalletMapper {
         return WalletResponse.builder()
                 .userId(wallet.getUser() != null ? wallet.getUser().getCode() : null)
                 .balance(wallet.getBalance())
+                .creditBalance(wallet.getBalance())
+                .personalBalance(wallet.getPersonalBalance() == null ? BigDecimal.ZERO : wallet.getPersonalBalance())
                 .status(WalletStatus.fromBalance(wallet.getBalance()).apiValue())
                 .pendingBalance(wallet.getPendingBalance())
                 .totalEarned(wallet.getTotalEarned())
