@@ -6,15 +6,19 @@ import com.example.becommerce.entity.Wallet;
 import com.example.becommerce.entity.WalletTransaction;
 import com.example.becommerce.entity.enums.PaymentMethod;
 import com.example.becommerce.entity.enums.TransactionStatus;
+import com.example.becommerce.entity.enums.TransactionType;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.WalletRepository;
 import com.example.becommerce.repository.WalletTransactionRepository;
+import com.example.becommerce.service.OrderService;
 import com.example.becommerce.service.PaymentGatewayService;
 import com.example.becommerce.utils.HmacUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +41,11 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
     private final WalletRepository walletRepository;
     private final ObjectMapper objectMapper;
 
+    /** Injected lazily to break the OrderService <-> PaymentGatewayService cycle. */
+    @Autowired
+    @Lazy
+    private OrderService orderService;
+
     @Value("${app.payment.vnpay.tmn-code:}")
     private String vnpayTmnCode;
     @Value("${app.payment.vnpay.secret-key:}")
@@ -45,6 +54,8 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
     private String vnpayPayUrl;
     @Value("${app.payment.vnpay.return-url:http://localhost:3000/wallet/topup-result}")
     private String vnpayReturnUrl;
+    @Value("${app.payment.vnpay.order-return-url:http://localhost:5173/customer/payment-result}")
+    private String vnpayOrderReturnUrl;
     @Value("${app.payment.vnpay.ip-address:127.0.0.1}")
     private String vnpayIpAddress;
 
@@ -84,16 +95,38 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
         tx.setGatewayTransactionId(queryParams.get("vnp_TransactionNo"));
         tx.setGatewayPayload(toJsonSafe(queryParams));
         if (success) {
-            confirmTopupAndCreditWallet(tx);
+            if (tx.getType() == TransactionType.PAYMENT && tx.getOrder() != null) {
+                confirmOrderPayment(tx);
+            } else {
+                confirmTopupAndCreditWallet(tx);
+            }
         } else {
             markTransactionFailed(tx);
         }
         return VnpayIpnResponse.builder().RspCode("00").Message("Confirm Success").build();
     }
 
+    /**
+     * Mark an order-payment transaction as paid and finalize the order
+     * (complete + commission split) via {@link OrderService}.
+     */
+    private void confirmOrderPayment(WalletTransaction tx) {
+        tx.setStatus(TransactionStatus.SUCCESS);
+        tx.setProcessedAt(LocalDateTime.now());
+        walletTransactionRepository.save(tx);
+
+        orderService.completeOrderAfterPayment(tx.getOrder().getId());
+    }
+
     private GatewayCheckoutData createVnpayCheckout(WalletTransaction tx) {
         require(vnpayTmnCode, "VNPay TMN code is missing");
         require(vnpaySecretKey, "VNPay secret key is missing");
+
+        boolean isOrderPayment = tx.getType() == TransactionType.PAYMENT && tx.getOrder() != null;
+        String returnUrl = isOrderPayment ? vnpayOrderReturnUrl : vnpayReturnUrl;
+        String orderInfo = isOrderPayment
+                ? "Thanh toan don hang - " + tx.getOrder().getCode()
+                : "Nap tien vi - " + tx.getTransactionCode();
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
         LocalDateTime expireAt = tx.getExpiredAt() == null ? now.plusMinutes(30) : tx.getExpiredAt();
@@ -106,9 +139,9 @@ public class PaymentGatewayServiceImpl implements PaymentGatewayService {
         params.put("vnp_CurrCode", "VND");
         params.put("vnp_IpAddr", vnpayIpAddress);
         params.put("vnp_Locale", "vn");
-        params.put("vnp_OrderInfo", "Nap tien vi - " + tx.getTransactionCode());
+        params.put("vnp_OrderInfo", orderInfo);
         params.put("vnp_OrderType", "other");
-        params.put("vnp_ReturnUrl", vnpayReturnUrl);
+        params.put("vnp_ReturnUrl", returnUrl);
         params.put("vnp_TxnRef", tx.getTransactionCode());
         params.put("vnp_ExpireDate", VNPAY_TIME_FORMAT.format(expireAt));
 

@@ -6,8 +6,10 @@ import com.example.becommerce.dto.request.order.CreateOrderRequest;
 import com.example.becommerce.dto.request.order.PriceAdjustmentRequest;
 import com.example.becommerce.dto.request.order.RejectOrderRequest;
 import com.example.becommerce.dto.request.order.RejectPriceAdjustmentRequest;
+import com.example.becommerce.dto.request.order.SelectPaymentMethodRequest;
 import com.example.becommerce.dto.request.order.UpdateOrderStatusRequest;
 import com.example.becommerce.dto.response.PagedResponse;
+import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
@@ -48,5 +50,16 @@ public interface OrderService {
 
     // ---- Payment flow --------------------------------------------------
 
-    void createPaymentTransactionForOrder(Long orderId);
+    /**
+     * Customer picks a payment method (cash or VNPay) for an order that is
+     * awaiting payment. Cash settles immediately; VNPay returns a checkout URL
+     * and the order is finalized later via {@link #completeOrderAfterPayment(Long)}.
+     */
+    OrderPaymentResponse selectPaymentMethod(String code, SelectPaymentMethodRequest request);
+
+    /**
+     * Finalize an order once its payment has been confirmed (e.g. from the VNPay
+     * IPN callback): move it to COMPLETED and run the commission split. Idempotent.
+     */
+    void completeOrderAfterPayment(Long orderId);
 }

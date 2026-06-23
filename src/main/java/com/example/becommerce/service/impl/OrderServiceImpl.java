@@ -8,8 +8,10 @@ import com.example.becommerce.dto.request.order.CreateOrderRequest;
 import com.example.becommerce.dto.request.order.PriceAdjustmentRequest;
 import com.example.becommerce.dto.request.order.RejectOrderRequest;
 import com.example.becommerce.dto.request.order.RejectPriceAdjustmentRequest;
+import com.example.becommerce.dto.request.order.SelectPaymentMethodRequest;
 import com.example.becommerce.dto.request.order.UpdateOrderStatusRequest;
 import com.example.becommerce.dto.response.PagedResponse;
+import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
@@ -23,6 +25,7 @@ import com.example.becommerce.entity.Wallet;
 import com.example.becommerce.entity.WalletTransaction;
 import com.example.becommerce.entity.enums.OrderActor;
 import com.example.becommerce.entity.enums.OrderStatus;
+import com.example.becommerce.entity.enums.PaymentMethod;
 import com.example.becommerce.entity.enums.PriceAdjustmentStatus;
 import com.example.becommerce.entity.enums.Role;
 import com.example.becommerce.entity.enums.TransactionStatus;
@@ -38,6 +41,7 @@ import com.example.becommerce.repository.WalletTransactionRepository;
 import com.example.becommerce.entity.enums.NotificationType;
 import com.example.becommerce.service.NotificationService;
 import com.example.becommerce.service.OrderService;
+import com.example.becommerce.service.PaymentGatewayService;
 import com.example.becommerce.service.WsEventPublisher;
 import com.example.becommerce.utils.OrderCodeGenerator;
 import com.example.becommerce.utils.OrderSpecification;
@@ -89,6 +93,7 @@ public class OrderServiceImpl implements OrderService {
     private final TransactionCodeGenerator        transactionCodeGenerator;
     private final WsEventPublisher                eventPublisher;
     private final NotificationService             notificationService;
+    private final PaymentGatewayService           paymentGatewayService;
 
     // ===============================================================
     // LIST + DETAIL
@@ -359,8 +364,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         OrderStatus from = order.getStatus();
-        order.setStatus(OrderStatus.COMPLETED);
-        order.setCompletedAt(LocalDateTime.now());
+        // Work is done — the order now waits for the customer to pay. Completion
+        // (and the commission split) happens once payment is confirmed.
+        order.setStatus(OrderStatus.AWAITING_PAYMENT);
         if (request.getFinalPrice() != null) {
             order.setFinalPrice(request.getFinalPrice());
         } else if (order.getFinalPrice() == null) {
@@ -378,17 +384,16 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        recordHistory(order, from, OrderStatus.COMPLETED, OrderActor.TECHNICIAN, technician.getId(), "Hoàn thành đơn");
-
-        // Process commission logic
-        processOrderCompletion(order);
+        recordHistory(order, from, OrderStatus.AWAITING_PAYMENT, OrderActor.TECHNICIAN, technician.getId(),
+                "Thợ hoàn tất công việc, chờ khách thanh toán");
 
         Order saved = orderRepository.save(order);
         eventPublisher.publishOrderStatusChanged(
-                saved.getCode(), from.apiValue(), OrderStatus.COMPLETED.apiValue());
-        notifyOrderEvent(saved.getCustomer(), NotificationType.ORDER_COMPLETED,
-                "Đơn hoàn thành",
-                "Đơn " + saved.getCode() + " đã hoàn thành",
+                saved.getCode(), from.apiValue(), OrderStatus.AWAITING_PAYMENT.apiValue());
+        notifyOrderEvent(saved.getCustomer(), NotificationType.PAYMENT_REQUESTED,
+                "Yêu cầu thanh toán",
+                "Thợ đã hoàn tất đơn " + saved.getCode() + ". Vui lòng thanh toán "
+                        + (saved.getFinalPrice() == null ? 0 : saved.getFinalPrice()) + "đ.",
                 saved.getCode());
         return orderMapper.toStatusChange(saved);
     }
@@ -679,7 +684,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         boolean allowed = (from == OrderStatus.SCHEDULED && target == OrderStatus.IN_PROGRESS)
-                || (from == OrderStatus.IN_PROGRESS && target == OrderStatus.COMPLETED);
+                || (from == OrderStatus.IN_PROGRESS && target == OrderStatus.AWAITING_PAYMENT);
 
         if (!allowed) {
             throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION,
@@ -744,50 +749,133 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public void createPaymentTransactionForOrder(Long orderId) {
-        // 1. Find order by id and check status = COMPLETED
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> AppException.notFound("Đơn hàng không tìm thấy"));
-        
-        if (order.getStatus() != OrderStatus.COMPLETED) {
-            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION, 
-                    "Đơn phải ở trạng thái hoàn thành mới có thể thanh toán");
+    public OrderPaymentResponse selectPaymentMethod(String code, SelectPaymentMethodRequest request) {
+        Order order = findOrder(code);
+        User customer = getCurrentUser();
+        ensureCustomerOf(order, customer);
+
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION,
+                    "Đơn không ở trạng thái chờ thanh toán");
         }
-        
-        // 2. Get customer wallet
-        Wallet wallet = order.getCustomer().getWallet();
-        if (wallet == null) {
-            throw AppException.badRequest(ErrorCode.BAD_REQUEST, "Không tìm thấy ví khách hàng");
+
+        PaymentMethod method;
+        try {
+            method = PaymentMethod.from(request.getMethod());
+        } catch (IllegalArgumentException ex) {
+            throw AppException.badRequest(ErrorCode.INVALID_PAYMENT_METHOD, "Phương thức thanh toán không hợp lệ");
         }
-        
-        // 3. Create WalletTransaction with type=PAYMENT, status=SUCCESS
-        BigDecimal finalPrice = BigDecimal.valueOf(order.getFinalPrice() != null ? order.getFinalPrice() : 0L);
+        if (method != PaymentMethod.CASH && method != PaymentMethod.VNPAY) {
+            throw AppException.badRequest(ErrorCode.INVALID_PAYMENT_METHOD,
+                    "Chỉ hỗ trợ thanh toán Tiền mặt hoặc VNPay");
+        }
+
+        order.setPaymentMethod(method);
+        long amount = order.getFinalPrice() != null ? order.getFinalPrice()
+                : (order.getEstimatedPrice() != null ? order.getEstimatedPrice() : 0L);
+
+        if (method == PaymentMethod.CASH) {
+            // Cash settles immediately: finalize the order and split commission.
+            finalizeOrderCompletion(order, "Khách hàng thanh toán bằng tiền mặt");
+            return OrderPaymentResponse.builder()
+                    .orderId(order.getCode())
+                    .status(order.getStatus().apiValue())
+                    .paymentMethod(method.apiValue())
+                    .amount(amount)
+                    .completed(true)
+                    .build();
+        }
+
+        // VNPay: create a pending payment ledger entry and hand the customer a checkout URL.
+        Wallet wallet = getOrCreateWallet(customer);
+        BigDecimal payAmount = BigDecimal.valueOf(amount);
         WalletTransaction transaction = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.PAYMENT))
                 .wallet(wallet)
+                .order(order)
                 .type(TransactionType.PAYMENT)
                 .walletType(WalletType.PERSONAL)
                 .category("PAYMENT")
                 .title("Thanh toán đơn hàng " + order.getCode())
-                .amount(finalPrice)
+                .amount(payAmount)
                 .fee(BigDecimal.ZERO)
-                .netAmount(finalPrice)
-                .afterBalance(wallet.getBalance().add(finalPrice).longValueExact())
-                .note("Thanh toán đơn hàng " + order.getCode())
-                .actor("SYSTEM")
+                .netAmount(payAmount)
+                .note("Thanh toán đơn hàng " + order.getCode() + " qua VNPay")
+                .actor("USER")
                 .relatedOrderCode(order.getCode())
-                .status(TransactionStatus.SUCCESS)
-                .order(order)
-                .processedAt(LocalDateTime.now())
+                .status(TransactionStatus.AWAITING_PAYMENT)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .expiredAt(LocalDateTime.now().plusMinutes(30))
                 .build();
-        
-        walletTransactionRepository.save(transaction);
-        
-        // 4. Update wallet balance
-        wallet.normalizeForPersistence();
-        wallet.setBalance(wallet.getBalance().add(transaction.getNetAmount()));
-        walletRepository.save(wallet);
-        
-        log.info("Payment transaction created for order {} with amount {}", order.getCode(), finalPrice);
+        transaction = walletTransactionRepository.save(transaction);
+        orderRepository.save(order);
+
+        PaymentGatewayService.GatewayCheckoutData checkout =
+                paymentGatewayService.createCheckout(transaction, PaymentMethod.VNPAY);
+
+        return OrderPaymentResponse.builder()
+                .orderId(order.getCode())
+                .status(order.getStatus().apiValue())
+                .paymentMethod(method.apiValue())
+                .amount(amount)
+                .completed(false)
+                .checkoutUrl(checkout.checkoutUrl())
+                .transactionId(transaction.getTransactionCode())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void completeOrderAfterPayment(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng"));
+
+        // Idempotent: a duplicate IPN must not double-credit the technician.
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            return;
+        }
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION,
+                    "Đơn không ở trạng thái chờ thanh toán");
+        }
+
+        finalizeOrderCompletion(order, "Thanh toán VNPay thành công");
+    }
+
+    /**
+     * Move an order to COMPLETED, run the commission split and notify both parties.
+     * Shared by the cash flow and the VNPay IPN callback.
+     */
+    private void finalizeOrderCompletion(Order order, String note) {
+        OrderStatus from = order.getStatus();
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setCompletedAt(LocalDateTime.now());
+
+        recordHistory(order, from, OrderStatus.COMPLETED, OrderActor.SYSTEM, null, note);
+
+        // Commission split: revenue to technician personal wallet, commission fee deducted.
+        processOrderCompletion(order);
+
+        Order saved = orderRepository.save(order);
+        eventPublisher.publishOrderStatusChanged(
+                saved.getCode(), from.apiValue(), OrderStatus.COMPLETED.apiValue());
+        notifyOrderEvent(saved.getCustomer(), NotificationType.PAYMENT_SUCCESS,
+                "Thanh toán thành công",
+                "Đơn " + saved.getCode() + " đã được thanh toán và hoàn thành",
+                saved.getCode());
+        notifyOrderEvent(saved.getTechnician(), NotificationType.ORDER_COMPLETED,
+                "Đơn hoàn thành",
+                "Đơn " + saved.getCode() + " đã hoàn thành và được thanh toán",
+                saved.getCode());
+    }
+
+    private Wallet getOrCreateWallet(User user) {
+        return walletRepository.findByUser_Id(user.getId())
+                .orElseGet(() -> walletRepository.save(Wallet.builder()
+                        .user(user)
+                        .balance(BigDecimal.ZERO)
+                        .personalBalance(BigDecimal.ZERO)
+                        .currency("VND")
+                        .build()));
     }
 }
