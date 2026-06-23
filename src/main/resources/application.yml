@@ -75,6 +75,7 @@ app:
       secret-key: ${VNPAY_SECRET_KEY:}
       pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       return-url: ${VNPAY_RETURN_URL:http://localhost:3000/wallet/topup-result}
+      order-return-url: ${VNPAY_ORDER_RETURN_URL:http://localhost:5173/customer/payment-result}
       ip-address: ${VNPAY_IP_ADDRESS:127.0.0.1}
   upload:
     base-dir: ${UPLOAD_BASE_DIR:uploads}

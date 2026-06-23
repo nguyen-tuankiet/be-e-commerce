@@ -9,7 +9,8 @@ public enum PaymentMethod {
     VIETQR,
     VNPAY,
     MOMO,
-    BANK_TRANSFER;
+    BANK_TRANSFER,
+    CASH;
 
     public String apiValue() {
         return name().toLowerCase(Locale.ROOT);

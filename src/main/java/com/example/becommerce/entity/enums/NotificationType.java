@@ -8,6 +8,7 @@ import java.util.Locale;
 public enum NotificationType {
     ORDER_ACCEPTED,
     PRICE_ADJUSTMENT,
+    PAYMENT_REQUESTED,
     ORDER_COMPLETED,
     PAYMENT_SUCCESS,
     PAYMENT_FAILED,

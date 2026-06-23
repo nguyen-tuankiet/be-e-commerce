@@ -6,9 +6,11 @@ import com.example.becommerce.dto.request.order.CreateOrderRequest;
 import com.example.becommerce.dto.request.order.PriceAdjustmentRequest;
 import com.example.becommerce.dto.request.order.RejectOrderRequest;
 import com.example.becommerce.dto.request.order.RejectPriceAdjustmentRequest;
+import com.example.becommerce.dto.request.order.SelectPaymentMethodRequest;
 import com.example.becommerce.dto.request.order.UpdateOrderStatusRequest;
 import com.example.becommerce.dto.response.ApiResponse;
 import com.example.becommerce.dto.response.PagedResponse;
+import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
@@ -99,6 +101,15 @@ public class OrderController {
             @PathVariable("id") String code,
             @Valid @RequestBody CompleteOrderRequest request) {
         return ResponseEntity.ok(ApiResponse.success(orderService.completeOrder(code, request)));
+    }
+
+    // ---- Payment (customer) ----------------------------------------
+
+    @PostMapping("/{id}/payment")
+    public ResponseEntity<ApiResponse<OrderPaymentResponse>> selectPaymentMethod(
+            @PathVariable("id") String code,
+            @Valid @RequestBody SelectPaymentMethodRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.selectPaymentMethod(code, request)));
     }
 
     // ---- Price adjustment ------------------------------------------

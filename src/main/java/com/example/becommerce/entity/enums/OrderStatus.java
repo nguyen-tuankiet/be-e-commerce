@@ -7,15 +7,17 @@ import java.util.Locale;
  * - NEW          : just created, no technician assigned yet
  * - ASSIGNED     : technician accepted the order (alternative to SCHEDULED)
  * - SCHEDULED    : technician accepted, scheduled time fixed
- * - IN_PROGRESS  : technician started working
- * - COMPLETED    : finished and paid
- * - CANCELLED    : cancelled by customer / system / admin
+ * - IN_PROGRESS      : technician started working
+ * - AWAITING_PAYMENT : technician finished the job, waiting for the customer to pay
+ * - COMPLETED        : finished and paid
+ * - CANCELLED        : cancelled by customer / system / admin
  */
 public enum OrderStatus {
     NEW,
     ASSIGNED,
     SCHEDULED,
     IN_PROGRESS,
+    AWAITING_PAYMENT,
     COMPLETED,
     CANCELLED;
 
