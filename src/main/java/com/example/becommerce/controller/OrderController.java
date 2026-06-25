@@ -112,6 +112,11 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(orderService.selectPaymentMethod(code, request)));
     }
 
+    @PostMapping("/{id}/payment/cash-confirm")
+    public ResponseEntity<ApiResponse<OrderStatusChangeResponse>> confirmCashPayment(@PathVariable("id") String code) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.confirmCashPayment(code)));
+    }
+
     // ---- Price adjustment ------------------------------------------
 
     @PatchMapping("/{id}/price")

@@ -399,23 +399,27 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Process commission and revenue for a completed order.
-     * Logic:
-     * 1. Add final price as revenue to technician wallet
-     * 2. Deduct fixed commission fee
-     * 3. Record both transactions
-     * 4. Update wallet status based on balance
-     * 5. Auto-lock if balance < minimum
+     * Settle a completed order. The cash flow and the VNPay flow move money
+     * differently:
+     *
+     * <ul>
+     *   <li><b>VNPay</b> — the platform collected the full amount, so it credits
+     *       the technician's <i>personal</i> wallet with the net (price − commission)
+     *       and routes the commission to the admin wallet.</li>
+     *   <li><b>Cash</b> — the technician already holds the full amount physically,
+     *       so the commission is deducted from the technician's <i>credit</i> wallet
+     *       (must have enough balance) and routed to the admin wallet.</li>
+     * </ul>
      */
-    private void processOrderCompletion(Order order) {
+    private void settleOrderPayment(Order order) {
         if (order.getTechnician() == null || order.getFinalPrice() == null || order.getFinalPrice() <= 0) {
             return;
         }
 
         User technician = order.getTechnician();
         BigDecimal finalPrice = BigDecimal.valueOf(order.getFinalPrice());
+        BigDecimal commission = getFixedCommissionFee();
 
-        // Get or create technician wallet
         Wallet wallet = walletRepository.findWithLockByUser_Id(technician.getId())
                 .orElseGet(() -> walletRepository.save(Wallet.builder()
                         .user(technician)
@@ -424,59 +428,116 @@ public class OrderServiceImpl implements OrderService {
                         .currency("VND")
                         .build()));
 
-        // Get fixed commission fee from system settings
-        BigDecimal commissionFee = getFixedCommissionFee();
+        if (order.getPaymentMethod() == PaymentMethod.CASH) {
+            settleCashOrder(order, wallet, commission);
+        } else {
+            settleOnlineOrder(order, wallet, finalPrice, commission);
+        }
 
-        // Record revenue addition transaction
-        BigDecimal personalBalanceAfterRevenue = safePersonalBalance(wallet).add(finalPrice);
-        WalletTransaction revenueTransaction = WalletTransaction.builder()
+        creditAdminCommission(order, commission, order.getPaymentMethod());
+    }
+
+    /** VNPay: credit the technician's personal wallet with price − commission. */
+    private void settleOnlineOrder(Order order, Wallet wallet, BigDecimal finalPrice, BigDecimal commission) {
+        BigDecimal net = finalPrice.subtract(commission).max(BigDecimal.ZERO);
+        BigDecimal personalAfter = safePersonalBalance(wallet).add(net);
+
+        WalletTransaction tx = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
                 .wallet(wallet)
                 .order(order)
                 .type(TransactionType.COMMISSION)
                 .walletType(WalletType.PERSONAL)
-                .category("REVENUE")
-                .title("Thu nhập đơn hoàn thành")
-                .amount(finalPrice)
-                .fee(BigDecimal.ZERO)
-                .netAmount(finalPrice)
-                .afterBalance(personalBalanceAfterRevenue.longValueExact())
-                .note("Cộng " + finalPrice + " từ đơn " + order.getCode())
+                .category("ORDER_INCOME")
+                .title("Cộng tiền đơn hàng #" + order.getCode() + " (thanh toán VNPay)")
+                .amount(net)
+                .fee(commission)
+                .netAmount(net)
+                .afterBalance(personalAfter.longValueExact())
+                .note("Đã trừ hoa hồng " + commission.toPlainString() + "đ")
                 .actor("SYSTEM")
+                .relatedOrderCode(order.getCode())
                 .status(TransactionStatus.SUCCESS)
                 .processedAt(LocalDateTime.now())
                 .build();
-        walletTransactionRepository.save(revenueTransaction);
+        walletTransactionRepository.save(tx);
 
-        // Update wallet balance with revenue
-        wallet.setPersonalBalance(personalBalanceAfterRevenue);
-        wallet.setTotalEarned(wallet.getTotalEarned().add(finalPrice));
+        wallet.normalizeForPersistence();
+        wallet.setPersonalBalance(personalAfter);
+        wallet.setTotalEarned(wallet.getTotalEarned().add(net));
+        walletRepository.save(wallet);
+    }
 
-        // Record commission deduction transaction
-        BigDecimal creditBalanceAfterDeduction = wallet.getBalance().subtract(commissionFee);
-        WalletTransaction commissionTransaction = WalletTransaction.builder()
+    /** Cash: deduct the commission from the technician's credit wallet. */
+    private void settleCashOrder(Order order, Wallet wallet, BigDecimal commission) {
+        BigDecimal creditBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+        if (creditBalance.compareTo(commission) < 0) {
+            throw AppException.badRequest(ErrorCode.INSUFFICIENT_BALANCE,
+                    "Ví tín dụng của thợ không đủ để trừ phí hoa hồng cho đơn này");
+        }
+
+        BigDecimal creditAfter = creditBalance.subtract(commission);
+        WalletTransaction tx = WalletTransaction.builder()
                 .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
                 .wallet(wallet)
                 .order(order)
                 .type(TransactionType.COMMISSION)
                 .walletType(WalletType.CREDIT)
                 .category("COMMISSION_DEDUCTION")
-                .title("Trừ phí hoa hồng")
-                .amount(commissionFee.negate())
+                .title("Trừ phí hoa hồng đơn hàng #" + order.getCode() + " (thanh toán Tiền mặt)")
+                .amount(commission.negate())
                 .fee(BigDecimal.ZERO)
-                .netAmount(commissionFee.negate())
-                .afterBalance(Math.max(0, creditBalanceAfterDeduction.longValueExact()))
-                .note("Trừ phí hoa hồng cho đơn " + order.getCode())
+                .netAmount(commission.negate())
+                .afterBalance(creditAfter.longValueExact())
+                .note("Khách thanh toán tiền mặt, trừ hoa hồng " + commission.toPlainString() + "đ")
                 .actor("SYSTEM")
+                .relatedOrderCode(order.getCode())
                 .status(TransactionStatus.SUCCESS)
                 .processedAt(LocalDateTime.now())
                 .build();
-        walletTransactionRepository.save(commissionTransaction);
+        walletTransactionRepository.save(tx);
 
-        // Update wallet balance with commission deduction
         wallet.normalizeForPersistence();
-        wallet.setBalance(creditBalanceAfterDeduction.max(BigDecimal.ZERO));
+        wallet.setBalance(creditAfter);
         walletRepository.save(wallet);
+    }
+
+    /** Route the order's commission into the admin wallet (Task-28). */
+    private void creditAdminCommission(Order order, BigDecimal commission, PaymentMethod method) {
+        User admin = userRepository.findFirstByRoleAndDeletedFalse(Role.ADMIN).orElse(null);
+        if (admin == null) {
+            log.warn("No admin user found to receive commission for order {}", order.getCode());
+            return;
+        }
+
+        Wallet adminWallet = getOrCreateWallet(admin);
+        BigDecimal balanceAfter = adminWallet.getBalance().add(commission);
+        String methodLabel = method == PaymentMethod.CASH ? "Tiền mặt" : "VNPay";
+
+        WalletTransaction tx = WalletTransaction.builder()
+                .transactionCode(transactionCodeGenerator.generateTransactionCode(TransactionType.COMMISSION))
+                .wallet(adminWallet)
+                .order(order)
+                .type(TransactionType.COMMISSION)
+                .walletType(WalletType.CREDIT)
+                .category("COMMISSION_INCOME")
+                .title("Hoa hồng đơn hàng #" + order.getCode() + " (" + methodLabel + ")")
+                .amount(commission)
+                .fee(BigDecimal.ZERO)
+                .netAmount(commission)
+                .afterBalance(balanceAfter.longValueExact())
+                .note("Thu hoa hồng từ thợ "
+                        + (order.getTechnician() != null ? order.getTechnician().getCode() : ""))
+                .actor("SYSTEM")
+                .relatedOrderCode(order.getCode())
+                .status(TransactionStatus.SUCCESS)
+                .processedAt(LocalDateTime.now())
+                .build();
+        walletTransactionRepository.save(tx);
+
+        adminWallet.normalizeForPersistence();
+        adminWallet.setBalance(balanceAfter);
+        walletRepository.save(adminWallet);
     }
 
     private BigDecimal getFixedCommissionFee() {
@@ -775,14 +836,24 @@ public class OrderServiceImpl implements OrderService {
                 : (order.getEstimatedPrice() != null ? order.getEstimatedPrice() : 0L);
 
         if (method == PaymentMethod.CASH) {
-            // Cash settles immediately: finalize the order and split commission.
-            finalizeOrderCompletion(order, "Khách hàng thanh toán bằng tiền mặt");
+            // Cash is a two-step flow (Task-28): the customer pays the technician in
+            // person, then the technician confirms receipt. The order stays in
+            // AWAITING_PAYMENT until the technician calls confirmCashPayment.
+            orderRepository.save(order);
+            // Same-status event so both dashboards refresh and pick up the chosen method.
+            eventPublisher.publishOrderStatusChanged(
+                    order.getCode(), order.getStatus().apiValue(), order.getStatus().apiValue());
+            notifyOrderEvent(order.getTechnician(), NotificationType.PAYMENT_REQUESTED,
+                    "Khách chọn thanh toán tiền mặt",
+                    "Khách đã chọn thanh toán tiền mặt cho đơn " + order.getCode()
+                            + ". Vui lòng thu tiền và bấm \"Đã nhận tiền\".",
+                    order.getCode());
             return OrderPaymentResponse.builder()
                     .orderId(order.getCode())
                     .status(order.getStatus().apiValue())
                     .paymentMethod(method.apiValue())
                     .amount(amount)
-                    .completed(true)
+                    .completed(false)
                     .build();
         }
 
@@ -826,6 +897,27 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public OrderStatusChangeResponse confirmCashPayment(String code) {
+        Order order = findOrder(code);
+        User technician = getCurrentUser();
+
+        if (technician.getRole() != Role.TECHNICIAN) {
+            throw AppException.forbidden("Chỉ thợ mới có thể xác nhận đã nhận tiền");
+        }
+        if (order.getTechnician() == null || !order.getTechnician().getId().equals(technician.getId())) {
+            throw AppException.forbidden("Bạn không phải thợ phụ trách đơn này");
+        }
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT || order.getPaymentMethod() != PaymentMethod.CASH) {
+            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION,
+                    "Đơn không ở trạng thái chờ thu tiền mặt");
+        }
+
+        finalizeOrderCompletion(order, "Thợ xác nhận đã nhận tiền mặt");
+        return orderMapper.toStatusChange(order);
+    }
+
+    @Override
+    @Transactional
     public void completeOrderAfterPayment(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng"));
@@ -853,8 +945,8 @@ public class OrderServiceImpl implements OrderService {
 
         recordHistory(order, from, OrderStatus.COMPLETED, OrderActor.SYSTEM, null, note);
 
-        // Commission split: revenue to technician personal wallet, commission fee deducted.
-        processOrderCompletion(order);
+        // Settlement depends on how the customer paid (VNPay vs cash).
+        settleOrderPayment(order);
 
         Order saved = orderRepository.save(order);
         eventPublisher.publishOrderStatusChanged(

@@ -58,6 +58,13 @@ public interface OrderService {
     OrderPaymentResponse selectPaymentMethod(String code, SelectPaymentMethodRequest request);
 
     /**
+     * Technician confirms they have physically received the cash from the customer.
+     * Deducts the order's commission from the technician's credit wallet (crediting
+     * the admin wallet) and finalizes the order. (Task-28)
+     */
+    OrderStatusChangeResponse confirmCashPayment(String code);
+
+    /**
      * Finalize an order once its payment has been confirmed (e.g. from the VNPay
      * IPN callback): move it to COMPLETED and run the commission split. Idempotent.
      */
