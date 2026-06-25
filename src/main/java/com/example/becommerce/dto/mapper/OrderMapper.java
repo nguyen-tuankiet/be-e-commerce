@@ -83,6 +83,7 @@ public class OrderMapper {
                 .scheduledAt(order.getScheduledAt())
                 .estimatedPrice(order.getEstimatedPrice())
                 .finalPrice(order.getFinalPrice())
+                .paymentMethod(order.getPaymentMethod() == null ? null : order.getPaymentMethod().apiValue())
                 .customer(toParty(order.getCustomer(), false))
                 .technician(toParty(order.getTechnician(), false))
                 .createdAt(order.getCreatedAt())
