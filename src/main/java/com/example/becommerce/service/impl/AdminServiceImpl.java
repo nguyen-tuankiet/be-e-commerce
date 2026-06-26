@@ -499,8 +499,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public WalletAdjustResponse adjustWallet(WalletAdjustRequest request) {
-        User technician = userRepository.findByCodeAndDeletedFalse(request.getTechnicianId())
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy kỹ thuật viên"));
+        User technician = resolveTechnician(request.getTechnicianId());
         Wallet wallet = walletRepository.findWithLockByUser_Id(technician.getId())
                 .orElseGet(() -> walletRepository.save(Wallet.builder()
                         .user(technician)
@@ -542,6 +541,23 @@ public class AdminServiceImpl implements AdminService {
                 .reason(request.getReason())
                 .createdAt(transaction.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Resolve a technician from the admin UI, which may send either the user
+     * code (e.g. "USR-004") or the numeric user id (e.g. "8555"), depending on
+     * the screen the request originates from.
+     */
+    private User resolveTechnician(String idOrCode) {
+        return userRepository.findByCodeAndDeletedFalse(idOrCode)
+                .or(() -> {
+                    try {
+                        return userRepository.findByIdAndDeletedFalse(Long.parseLong(idOrCode.trim()));
+                    } catch (NumberFormatException ex) {
+                        return java.util.Optional.empty();
+                    }
+                })
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy kỹ thuật viên"));
     }
 
     @Override

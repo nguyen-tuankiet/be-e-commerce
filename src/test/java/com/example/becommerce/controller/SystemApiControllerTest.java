@@ -374,7 +374,7 @@ class SystemApiControllerTest {
                 .id("GU-0001").status("accepted").message("Đã cập nhật").build();
         PriceAdjustmentEnvelope envelope = PriceAdjustmentEnvelope.builder().id("GU-0001").build();
 
-        when(orderService.getOrders(any(), any(), anyInt(), anyInt()))
+        when(orderService.getOrders(any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(PagedResponse.of(List.of(order), 1, 10, 1));
         when(orderService.getOrderById("GU-0001")).thenReturn(order);
         when(orderService.createOrder(any())).thenReturn(order);

@@ -50,9 +50,12 @@ public class OrderController {
     public ResponseEntity<ApiResponse<PagedResponse<OrderResponse>>> getOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String customer,
+            @RequestParam(required = false) String technician,
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "10") int limit) {
-        return ResponseEntity.ok(ApiResponse.success(orderService.getOrders(status, keyword, page, limit)));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.getOrders(status, keyword, customer, technician, page, limit)));
     }
 
     @GetMapping("/{id}")
