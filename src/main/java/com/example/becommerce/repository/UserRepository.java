@@ -36,6 +36,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByCodeAndDeletedFalse(String code);
 
+    Optional<User> findFirstByRoleAndDeletedFalse(Role role);
+
     long countByRoleAndStatusAndDeletedFalse(Role role, UserStatus status);
 
     Page<User> findByRoleAndStatusAndDistrictContainingIgnoreCaseAndFullNameContainingIgnoreCaseAndDeletedFalse(
