@@ -108,7 +108,12 @@ public class AuthServiceImpl implements AuthService {
         emailConfirmationTokenRepository.save(token);
 
         // 6. Send confirmation email
-        emailService.sendConfirmationEmail(user.getEmail(), user.getFullName(), confirmationToken);
+        try {
+            emailService.sendConfirmationEmail(user.getEmail(), user.getFullName(), confirmationToken);
+        } catch (Exception e) {
+            log.error("Error send email confirmation email: {}", e.getMessage());
+        }
+        
         log.info("Confirmation email sent to: {}", user.getEmail());
 
         // 7. Issue tokens

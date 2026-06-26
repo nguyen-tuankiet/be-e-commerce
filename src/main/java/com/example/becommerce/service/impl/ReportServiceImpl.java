@@ -3,6 +3,7 @@ package com.example.becommerce.service.impl;
 import com.example.becommerce.constant.ErrorCode;
 import com.example.becommerce.dto.mapper.ReportMapper;
 import com.example.becommerce.dto.request.report.CreateReportRequest;
+import com.example.becommerce.dto.request.report.ResolveReportRequest;
 import com.example.becommerce.dto.response.PagedResponse;
 import com.example.becommerce.dto.response.report.ReportResponse;
 import com.example.becommerce.entity.Order;
@@ -105,6 +106,49 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
 
         return PagedResponse.of(items, page, limit, reportPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReportResponse getReportByCode(String code) {
+        OrderReport report = reportRepository.findByCode(code)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo " + code));
+        return reportMapper.toResponse(report, true);
+    }
+
+    @Override
+    @Transactional
+    public ReportResponse resolveReport(String code, ResolveReportRequest request) {
+        OrderReport report = reportRepository.findByCode(code)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo " + code));
+
+        ReportStatus nextStatus;
+        try {
+            nextStatus = ReportStatus.from(request.getStatus());
+        } catch (IllegalArgumentException ex) {
+            throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, "Trạng thái không hợp lệ");
+        }
+        if (nextStatus == null) {
+            throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, "Trạng thái không hợp lệ");
+        }
+
+        report.setStatus(nextStatus);
+        report.setResolutionNote(request.getNote());
+        
+        User current = getCurrentUser();
+        report.setResolvedBy(current.getEmail());
+        report.setResolvedAt(java.time.LocalDateTime.now());
+
+        if (Boolean.TRUE.equals(request.getLockTechnician()) && report.getTechnician() != null) {
+            User tech = report.getTechnician();
+            tech.setStatus(com.example.becommerce.entity.enums.UserStatus.LOCKED);
+            userRepository.save(tech);
+            log.info("Technician {} locked due to report {}", tech.getCode(), report.getCode());
+        }
+
+        OrderReport saved = reportRepository.save(report);
+        log.info("Report {} resolved to status {} by {}", saved.getCode(), saved.getStatus(), current.getEmail());
+        return reportMapper.toResponse(saved, true);
     }
 
     // ----------------------------------------------------------------

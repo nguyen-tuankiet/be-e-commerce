@@ -69,6 +69,15 @@ public class OrderReport {
     @Builder.Default
     private ReportStatus status = ReportStatus.OPEN;
 
+    @Column(columnDefinition = "TEXT")
+    private String resolutionNote;
+
+    @Column(name = "resolved_by")
+    private String resolvedBy;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "order_report_evidence",
