@@ -11,5 +11,7 @@ public interface OrderReportRepository
 
     boolean existsByCode(String code);
 
+    java.util.Optional<OrderReport> findByCode(String code);
+
     long count();
 }

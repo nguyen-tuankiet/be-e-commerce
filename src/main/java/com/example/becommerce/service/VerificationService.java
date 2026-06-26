@@ -17,4 +17,6 @@ public interface VerificationService {
     VerificationDetailResponse get(String code);
 
     VerificationReviewResponse review(String code, ReviewVerificationRequest request);
+
+    VerificationDetailResponse getLatest();
 }

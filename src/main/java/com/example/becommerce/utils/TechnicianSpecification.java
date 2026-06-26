@@ -5,6 +5,7 @@ import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
+import com.example.becommerce.entity.enums.UserStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +34,12 @@ public final class TechnicianSpecification {
 
             var userJoin = root.join("user", JoinType.INNER);
             predicates.add(cb.isFalse(userJoin.get("deleted")));
+            // Enforce that only ACTIVE users are shown (exclude PENDING, LOCKED, INACTIVE)
+            predicates.add(cb.equal(userJoin.get("status"), UserStatus.ACTIVE));
 
-            if (isAvailable != null) {
-                predicates.add(cb.equal(root.get("isAvailable"), isAvailable));
-            }
+            // Default availability to true if not specified
+            Boolean targetAvailable = isAvailable != null ? isAvailable : Boolean.TRUE;
+            predicates.add(cb.equal(root.get("isAvailable"), targetAvailable));
 
             if (StringUtils.hasText(service)) {
                 String like = "%" + service.toLowerCase() + "%";

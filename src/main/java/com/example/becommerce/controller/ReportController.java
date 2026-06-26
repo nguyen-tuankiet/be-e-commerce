@@ -1,20 +1,18 @@
 package com.example.becommerce.controller;
 
+import com.example.becommerce.dto.request.report.ResolveReportRequest;
 import com.example.becommerce.dto.response.ApiResponse;
 import com.example.becommerce.dto.response.PagedResponse;
 import com.example.becommerce.dto.response.report.ReportResponse;
 import com.example.becommerce.service.ReportService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
- * GET /api/reports — admin-only listing of incident reports across the platform,
- * filterable by status and free-text keyword.
+ * Incident reports endpoints for Admin.
  */
 @RestController
 @RequestMapping("/api/reports")
@@ -31,5 +29,20 @@ public class ReportController {
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "10") int limit) {
         return ResponseEntity.ok(ApiResponse.success(reportService.listReports(status, keyword, page, limit)));
+    }
+
+    @GetMapping("/{code}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ReportResponse>> getReport(
+            @PathVariable("code") String code) {
+        return ResponseEntity.ok(ApiResponse.success(reportService.getReportByCode(code)));
+    }
+
+    @PatchMapping("/{code}/resolve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ReportResponse>> resolveReport(
+            @PathVariable("code") String code,
+            @Valid @RequestBody ResolveReportRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(reportService.resolveReport(code, request)));
     }
 }

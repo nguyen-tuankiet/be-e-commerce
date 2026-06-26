@@ -200,6 +200,15 @@ public class VerificationServiceImpl implements VerificationService {
         return verificationMapper.toReviewResponse(saved, syncedStatus);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public VerificationDetailResponse getLatest() {
+        User current = getCurrentUser();
+        return verificationRepository.findTopByTechnician_IdOrderBySubmittedAtDesc(current.getId())
+                .map(verificationMapper::toDetail)
+                .orElse(null);
+    }
+
     // ===============================================================
     // Helpers
     // ===============================================================

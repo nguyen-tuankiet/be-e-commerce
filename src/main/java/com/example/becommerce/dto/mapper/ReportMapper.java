@@ -32,6 +32,9 @@ public class ReportMapper {
                 .customer(includeParties ? toPartyRef(report.getCustomer()) : null)
                 .technician(includeParties ? toPartyRef(report.getTechnician()) : null)
                 .createdAt(report.getCreatedAt())
+                .resolutionNote(report.getResolutionNote())
+                .resolvedBy(report.getResolvedBy())
+                .resolvedAt(report.getResolvedAt())
                 .build();
     }
 

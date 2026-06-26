@@ -51,6 +51,11 @@ public class VerificationController {
                 .body(ApiResponse.success(verificationService.submit(request)));
     }
 
+    @GetMapping("/latest")
+    public ResponseEntity<ApiResponse<VerificationDetailResponse>> getLatest() {
+        return ResponseEntity.ok(ApiResponse.success(verificationService.getLatest()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<VerificationDetailResponse>> get(@PathVariable("id") String code) {
         return ResponseEntity.ok(ApiResponse.success(verificationService.get(code)));

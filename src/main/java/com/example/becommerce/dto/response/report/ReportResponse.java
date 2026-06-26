@@ -29,6 +29,10 @@ public class ReportResponse {
 
     private LocalDateTime createdAt;
 
+    private String resolutionNote;
+    private String resolvedBy;
+    private LocalDateTime resolvedAt;
+
     @Getter
     @Builder
     @JsonInclude(JsonInclude.Include.NON_NULL)
