@@ -101,10 +101,20 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public PagedResponse<OrderResponse> getOrders(String status, String keyword, int page, int limit) {
+    public PagedResponse<OrderResponse> getOrders(String status, String keyword, String customer, String technician, int page, int limit) {
         User current = getCurrentUser();
         Long customerId  = current.getRole() == Role.CUSTOMER   ? current.getId() : null;
         Long technicianId = current.getRole() == Role.TECHNICIAN ? current.getId() : null;
+
+        // Admin may scope the list to a specific customer/technician (accepts code or numeric id).
+        if (current.getRole() == Role.ADMIN) {
+            if (customer != null && !customer.isBlank()) {
+                customerId = resolveUserId(customer);
+            }
+            if (technician != null && !technician.isBlank()) {
+                technicianId = resolveUserId(technician);
+            }
+        }
 
         Specification<Order> spec = OrderSpecification.buildFilter(status, customerId, technicianId, keyword);
 
@@ -785,6 +795,25 @@ public class OrderServiceImpl implements OrderService {
         String email = authentication.getName();
         return userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng hiện tại"));
+    }
+
+    /**
+     * Resolve a user id from either a user code ("USR-004") or a numeric id
+     * ("3549"). Returns -1 when no such user exists so the filter simply yields
+     * no results instead of failing.
+     */
+    private Long resolveUserId(String codeOrId) {
+        return userRepository.findByCodeAndDeletedFalse(codeOrId)
+                .map(User::getId)
+                .or(() -> {
+                    try {
+                        return userRepository.findByIdAndDeletedFalse(Long.parseLong(codeOrId.trim()))
+                                .map(User::getId);
+                    } catch (NumberFormatException ex) {
+                        return java.util.Optional.empty();
+                    }
+                })
+                .orElse(-1L);
     }
 
     /**

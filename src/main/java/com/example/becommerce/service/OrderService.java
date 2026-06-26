@@ -22,7 +22,7 @@ public interface OrderService {
 
     // ---- Listing / retrieval ---------------------------------------
 
-    PagedResponse<OrderResponse> getOrders(String status, String keyword, int page, int limit);
+    PagedResponse<OrderResponse> getOrders(String status, String keyword, String customer, String technician, int page, int limit);
 
     OrderResponse getOrderById(String code);
 
