@@ -79,8 +79,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 3. Generate unique user code
-        long count = userRepository.countAll();
-        String code = codeGenerator.generate(count + 1);
+        long seq = userRepository.countAll() + 1;
+        String code = codeGenerator.generate(seq);
+        while (userRepository.existsByCode(code)) {
+            seq++;
+            code = codeGenerator.generate(seq);
+        }
 
         // 4. Build and save user
         User user = User.builder()

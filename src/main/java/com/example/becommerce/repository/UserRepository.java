@@ -36,6 +36,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByCodeAndDeletedFalse(String code);
 
+    boolean existsByCode(String code);
+
     Optional<User> findFirstByRoleAndDeletedFalse(Role role);
 
     long countByRoleAndStatusAndDeletedFalse(Role role, UserStatus status);
