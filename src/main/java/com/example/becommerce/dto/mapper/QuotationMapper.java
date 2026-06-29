@@ -11,6 +11,8 @@ public class QuotationMapper {
 
     public QuotationResponse toResponse(Quotation q) {
         if (q == null) return null;
+        String orderCode = q.getOrder() != null ? q.getOrder().getCode() : null;
+        Long orderId = q.getOrder() != null ? q.getOrder().getId() : null;
         return QuotationResponse.builder()
                 .id(q.getCode())
                 .conversationId(q.getConversation() == null ? null : q.getConversation().getCode())
@@ -22,6 +24,8 @@ public class QuotationMapper {
                 .notes(q.getNotes())
                 .status(q.getStatus() == null ? null : q.getStatus().apiValue())
                 .createdAt(q.getCreatedAt())
+                .orderCode(orderCode)
+                .orderId(orderId)
                 .build();
     }
 
@@ -38,11 +42,13 @@ public class QuotationMapper {
     }
 
     public AcceptQuotationResponse toAcceptResponse(Quotation q) {
+        String orderCode = q.getOrder() != null ? q.getOrder().getCode() : null;
         return AcceptQuotationResponse.builder()
                 .id(q.getCode())
                 .status(q.getStatus() == null ? null : q.getStatus().apiValue())
                 .orderId(q.getOrder() == null ? null : q.getOrder().getCode())
                 .acceptedAt(q.getAcceptedAt())
+                .orderCode(orderCode)
                 .build();
     }
 }

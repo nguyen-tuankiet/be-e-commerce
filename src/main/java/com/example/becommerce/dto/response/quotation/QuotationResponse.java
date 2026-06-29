@@ -23,4 +23,6 @@ public class QuotationResponse {
 
     private String status;
     private LocalDateTime createdAt;
+    private String orderCode;
+    private Long orderId;
 }
