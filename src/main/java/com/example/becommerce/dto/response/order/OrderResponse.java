@@ -1,8 +1,10 @@
 package com.example.becommerce.dto.response.order;
 
+import com.example.becommerce.dto.response.warranty.WarrantyResponse;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.List;
  * via the OrderMapper.toListItem variant.
  */
 @Getter
+@Setter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OrderResponse {
@@ -49,4 +52,5 @@ public class OrderResponse {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private WarrantyResponse warrantyTicket;
 }

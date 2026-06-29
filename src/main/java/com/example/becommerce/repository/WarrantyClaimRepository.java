@@ -18,4 +18,6 @@ public interface WarrantyClaimRepository extends JpaRepository<WarrantyClaim, Lo
     boolean existsByCode(String code);
 
     long count();
+
+    Optional<WarrantyClaim> findByCode(String code);
 }
