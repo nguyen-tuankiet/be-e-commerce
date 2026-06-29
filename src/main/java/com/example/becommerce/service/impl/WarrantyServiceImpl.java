@@ -140,4 +140,55 @@ public class WarrantyServiceImpl implements WarrantyService {
         return userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng hiện tại"));
     }
+
+    @Override
+    @Transactional
+    public WarrantyResponse updateWarrantyStatus(String warrantyCode, String newStatus) {
+        User technician = getCurrentUser();
+
+        WarrantyClaim claim = warrantyRepository.findByCode(warrantyCode)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy yêu cầu bảo hành"));
+
+        // Check quyền: Chỉ thợ của đơn này mới được duyệt
+        if (technician.getRole() != Role.TECHNICIAN || !claim.getTechnician().getId().equals(technician.getId())) {
+            throw AppException.forbidden("Bạn không có quyền xử lý yêu cầu bảo hành này");
+        }
+
+        if (claim.getStatus() != WarrantyStatus.PENDING) {
+            throw AppException.badRequest(ErrorCode.INVALID_STATUS, "Yêu cầu này đã được xử lý");
+        }
+
+        if ("in_progress".equalsIgnoreCase(newStatus)) {
+            claim.setStatus(WarrantyStatus.IN_PROGRESS);
+
+            Order originalOrder = claim.getOrder();
+            Order warrantyOrder = Order.builder()
+                    .code(codeGenerator.generate())
+                    .customer(claim.getCustomer())
+                    .technician(technician)
+                    .deviceName(originalOrder.getDeviceName())
+                    .description("BẢO HÀNH: " + claim.getDescription())
+                    .address(originalOrder.getAddress())
+                    .serviceCategory(originalOrder.getServiceCategory())
+                    .serviceName(originalOrder.getServiceName())
+                    .subService(originalOrder.getSubService())
+                    .estimatedPrice(0L) // Giá 0đ
+                    .finalPrice(0L)     // Giá 0đ
+                    .scheduledAt(claim.getScheduledAt())
+                    .status(OrderStatus.SCHEDULED) // Ném thẳng vào tab Sắp hẹn
+                    .isWarranty(true) // Đánh cờ đây là đơn bảo hành (để FE hiện Tag màu cam)
+                    .build();
+
+            orderRepository.save(warrantyOrder);
+            log.info("Auto-generated 0 VND Warranty Order {} from Claim {}", warrantyOrder.getCode(), claim.getCode());
+
+        } else if ("rejected".equalsIgnoreCase(newStatus)) {
+            claim.setStatus(WarrantyStatus.REJECTED);
+        } else {
+            throw AppException.badRequest(ErrorCode.INVALID_STATUS, "Trạng thái không hợp lệ");
+        }
+
+        WarrantyClaim saved = warrantyRepository.save(claim);
+        return warrantyMapper.toResponse(saved);
+    }
 }

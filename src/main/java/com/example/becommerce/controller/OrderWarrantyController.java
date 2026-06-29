@@ -9,12 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Warranty endpoints scoped under an order:
@@ -40,5 +35,12 @@ public class OrderWarrantyController {
     @GetMapping("/{id}/warranty")
     public ResponseEntity<ApiResponse<WarrantyResponse>> getWarranty(@PathVariable("id") String orderCode) {
         return ResponseEntity.ok(ApiResponse.success(warrantyService.getWarrantyByOrder(orderCode)));
+    }
+
+    @PatchMapping("/warranty/{warrantyCode}/status")
+    public ResponseEntity<ApiResponse<WarrantyResponse>> updateWarrantyStatus(
+            @PathVariable String warrantyCode,
+            @RequestParam String status) {
+        return ResponseEntity.ok(ApiResponse.success(warrantyService.updateWarrantyStatus(warrantyCode, status)));
     }
 }
