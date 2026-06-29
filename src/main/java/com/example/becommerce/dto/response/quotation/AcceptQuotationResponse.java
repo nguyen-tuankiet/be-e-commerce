@@ -14,5 +14,6 @@ public class AcceptQuotationResponse {
     private String id;
     private String status;
     private String orderId;
+    private String orderCode;
     private LocalDateTime acceptedAt;
 }

@@ -80,9 +80,13 @@ public class QuotationServiceImpl implements QuotationService {
             throw AppException.forbidden("Bạn không phải thợ của cuộc trò chuyện này");
         }
 
+        Order order = orderRepository.findByCodeAndDeletedFalse(request.getOrderCode())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng " + request.getOrderCode()));
+
         Quotation quotation = Quotation.builder()
                 .code(quotationCodeGenerator.generate())
                 .conversation(conversation)
+                .order(order)
                 .technician(sender)
                 .serviceName(request.getServiceName())
                 .description(request.getDescription())
@@ -141,32 +145,37 @@ public class QuotationServiceImpl implements QuotationService {
                     "Báo giá không còn ở trạng thái chờ duyệt");
         }
 
-        Order order = Order.builder()
-                .code(orderCodeGenerator.generate())
-                .customer(customer)
-                .technician(quotation.getTechnician())
-                .serviceName(quotation.getServiceName())
-                .description(quotation.getDescription())
-                .estimatedPrice(quotation.getPrice())
-                .scheduledAt(quotation.getScheduledAt())
-                .expectedTime(quotation.getScheduledAt())
-                .status(OrderStatus.SCHEDULED)
-                .build();
-        if (conversation.getOrder() == null) {
-            // First time the conversation gets an order — link it.
-            conversation.setOrder(order);
+        Order order = quotation.getOrder();
+        if (order == null) {
+            throw AppException.badRequest(ErrorCode.BAD_REQUEST, "Báo giá này không gắn với đơn hàng nào");
         }
+
+        // Chặn khách nhận báo giá nếu đơn hàng đã bị hủy hoặc hoàn thành
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            throw AppException.badRequest(ErrorCode.INVALID_ORDER_STATUS_TRANSITION, "Đơn hàng này đã bị hủy hoặc đã hoàn thành, không thể nhận báo giá nữa.");
+        }
+        OrderStatus oldStatus = order.getStatus();
+
+        // Cập nhật đơn hàng
+        order.setFinalPrice(quotation.getPrice());
+        order.setEstimatedPrice(quotation.getPrice());
+        order.setScheduledAt(quotation.getScheduledAt());
+        order.setExpectedTime(quotation.getScheduledAt());
+        order.setStatus(OrderStatus.SCHEDULED);
+
+        order.setTechnician(quotation.getTechnician());
+
         Order savedOrder = orderRepository.save(order);
 
         quotation.setStatus(QuotationStatus.ACCEPTED);
         quotation.setAcceptedAt(LocalDateTime.now());
-        quotation.setOrder(savedOrder);
         Quotation savedQuote = quotationRepository.save(quotation);
+
         conversationRepository.save(conversation);
 
-        // New order is born SCHEDULED — emit so both parties can react.
+        // Truyền oldStatus vào thay vì truyền null để FE bắt event chuẩn xác hơn
         eventPublisher.publishOrderStatusChanged(
-                savedOrder.getCode(), null, OrderStatus.SCHEDULED.apiValue());
+                savedOrder.getCode(), oldStatus.apiValue(), OrderStatus.SCHEDULED.apiValue());
 
         // Notify the technician their quote was accepted.
         try {

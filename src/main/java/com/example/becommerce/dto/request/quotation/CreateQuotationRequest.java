@@ -30,4 +30,5 @@ public class CreateQuotationRequest {
     private LocalDateTime scheduledAt;
 
     private String notes;
+    private String orderCode;
 }
