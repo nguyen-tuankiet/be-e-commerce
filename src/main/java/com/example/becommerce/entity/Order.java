@@ -113,6 +113,10 @@ public class Order {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    @Column(name = "is_warranty")
+    @Builder.Default
+    private Boolean isWarranty = false;
+
     // ---- Audit ------------------------------------------------------
 
     @CreationTimestamp

@@ -15,6 +15,7 @@ import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
+import com.example.becommerce.dto.response.warranty.WarrantyResponse;
 import com.example.becommerce.entity.Order;
 import com.example.becommerce.entity.OrderImage;
 import com.example.becommerce.entity.OrderPriceAdjustment;
@@ -32,12 +33,7 @@ import com.example.becommerce.entity.enums.TransactionStatus;
 import com.example.becommerce.entity.enums.TransactionType;
 import com.example.becommerce.entity.enums.WalletType;
 import com.example.becommerce.exception.AppException;
-import com.example.becommerce.repository.OrderPriceAdjustmentRepository;
-import com.example.becommerce.repository.OrderRepository;
-import com.example.becommerce.repository.SystemSettingRepository;
-import com.example.becommerce.repository.UserRepository;
-import com.example.becommerce.repository.WalletRepository;
-import com.example.becommerce.repository.WalletTransactionRepository;
+import com.example.becommerce.repository.*;
 import com.example.becommerce.entity.enums.NotificationType;
 import com.example.becommerce.service.NotificationService;
 import com.example.becommerce.service.OrderService;
@@ -94,6 +90,7 @@ public class OrderServiceImpl implements OrderService {
     private final WsEventPublisher                eventPublisher;
     private final NotificationService             notificationService;
     private final PaymentGatewayService           paymentGatewayService;
+    private final WarrantyClaimRepository warrantyRepository;
 
     // ===============================================================
     // LIST + DETAIL
@@ -126,7 +123,11 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> ordersPage = orderRepository.findAll(spec, pageable);
 
         List<OrderResponse> items = ordersPage.getContent().stream()
-                .map(orderMapper::toListItem)
+                .map(order -> {
+                    OrderResponse res = orderMapper.toListItem(order);
+                    enrichOrderWithWarranty(order, res);
+                    return res;
+                })
                 .toList();
 
         return PagedResponse.of(items, page, limit, ordersPage.getTotalElements());
@@ -137,7 +138,10 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse getOrderById(String code) {
         Order order = findOrder(code);
         ensureCanRead(order, getCurrentUser());
-        return orderMapper.toDetailResponse(order);
+
+        OrderResponse response = orderMapper.toDetailResponse(order);
+        enrichOrderWithWarranty(order, response);
+        return response;
     }
 
     // ===============================================================
@@ -972,9 +976,10 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
 
+        order.setWarrantyMonths(1);
+
         recordHistory(order, from, OrderStatus.COMPLETED, OrderActor.SYSTEM, null, note);
 
-        // Settlement depends on how the customer paid (VNPay vs cash).
         settleOrderPayment(order);
 
         Order saved = orderRepository.save(order);
@@ -998,5 +1003,18 @@ public class OrderServiceImpl implements OrderService {
                         .personalBalance(BigDecimal.ZERO)
                         .currency("VND")
                         .build()));
+    }
+
+    private void enrichOrderWithWarranty(Order order, OrderResponse response) {
+        warrantyRepository.findTopByOrder_IdOrderByCreatedAtDesc(order.getId())
+                .ifPresent(claim -> {
+                    var ticket = WarrantyResponse.builder()
+                            .id(claim.getCode())
+                            .status(claim.getStatus().name())
+                            .description(claim.getDescription())
+                            .scheduledAt(claim.getScheduledAt())
+                            .build();
+                    response.setWarrantyTicket(ticket);
+                });
     }
 }
