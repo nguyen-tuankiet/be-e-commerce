@@ -15,6 +15,7 @@ import com.example.becommerce.repository.OrderRepository;
 import com.example.becommerce.repository.UserRepository;
 import com.example.becommerce.repository.WarrantyClaimRepository;
 import com.example.becommerce.service.WarrantyService;
+import com.example.becommerce.service.WsEventPublisher;
 import com.example.becommerce.utils.WarrantyCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class WarrantyServiceImpl implements WarrantyService {
     private final UserRepository          userRepository;
     private final WarrantyMapper          warrantyMapper;
     private final WarrantyCodeGenerator   codeGenerator;
+    private final WsEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -81,6 +83,13 @@ public class WarrantyServiceImpl implements WarrantyService {
 
         WarrantyClaim saved = warrantyRepository.save(claim);
         log.info("Warranty {} created on order {} by customer {}", saved.getCode(), order.getCode(), customer.getCode());
+
+        eventPublisher.publishOrderStatusChanged(
+                order.getCode(),
+                order.getStatus().apiValue(),
+                order.getStatus().apiValue()
+        );
+
         return warrantyMapper.toResponse(saved);
     }
 
@@ -158,11 +167,13 @@ public class WarrantyServiceImpl implements WarrantyService {
             throw AppException.badRequest(ErrorCode.INVALID_STATUS, "Yêu cầu này đã được xử lý");
         }
 
+        Order originalOrder = claim.getOrder();
+        Order warrantyOrder = null;
+
         if ("in_progress".equalsIgnoreCase(newStatus)) {
             claim.setStatus(WarrantyStatus.IN_PROGRESS);
 
-            Order originalOrder = claim.getOrder();
-            Order warrantyOrder = Order.builder()
+            warrantyOrder = Order.builder()
                     .code(codeGenerator.generate())
                     .customer(claim.getCustomer())
                     .technician(technician)
@@ -189,6 +200,23 @@ public class WarrantyServiceImpl implements WarrantyService {
         }
 
         WarrantyClaim saved = warrantyRepository.save(claim);
+
+        // BỔ SUNG: Bắn event 1 -> Báo cho đơn gốc biết trạng thái bảo hành đã bị đổi (để khách hàng thấy box Xanh/Đỏ)
+        eventPublisher.publishOrderStatusChanged(
+                originalOrder.getCode(),
+                originalOrder.getStatus().apiValue(),
+                originalOrder.getStatus().apiValue()
+        );
+
+        // BỔ SUNG: Bắn event 2 -> Nếu có sinh ra đơn 0đ, bắn event cho đơn mới để nó tự lọt vào tab Bảo hành / Sắp hẹn
+        if (warrantyOrder != null) {
+            eventPublisher.publishOrderStatusChanged(
+                    warrantyOrder.getCode(),
+                    null,
+                    OrderStatus.SCHEDULED.apiValue()
+            );
+        }
+
         return warrantyMapper.toResponse(saved);
     }
 }

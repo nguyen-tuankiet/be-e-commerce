@@ -409,6 +409,12 @@ public class OrderServiceImpl implements OrderService {
                 "Thợ đã hoàn tất đơn " + saved.getCode() + ". Vui lòng thanh toán "
                         + (saved.getFinalPrice() == null ? 0 : saved.getFinalPrice()) + "đ.",
                 saved.getCode());
+
+        eventPublisher.publishOrderStatusChanged(
+                saved.getCode(),
+                from.apiValue(),
+                OrderStatus.AWAITING_PAYMENT.apiValue());
+
         return orderMapper.toStatusChange(saved);
     }
 
@@ -670,10 +676,12 @@ public class OrderServiceImpl implements OrderService {
         adj.setStatus(PriceAdjustmentStatus.APPROVED);
         adj.setApprovedAt(LocalDateTime.now());
 
-        // Sync the order's final price with the approved value.
         order.setFinalPrice(adj.getNewPrice());
         adjustmentRepository.save(adj);
         orderRepository.save(order);
+
+        eventPublisher.publishOrderStatusChanged(
+                order.getCode(), order.getStatus().apiValue(), order.getStatus().apiValue());
 
         return PriceAdjustmentEnvelope.builder()
                 .id(order.getCode())
@@ -696,6 +704,9 @@ public class OrderServiceImpl implements OrderService {
         adj.setRejectedAt(LocalDateTime.now());
         adj.setRejectionReason(request.getReason());
         adjustmentRepository.save(adj);
+
+        eventPublisher.publishOrderStatusChanged(
+                order.getCode(), order.getStatus().apiValue(), order.getStatus().apiValue());
 
         return PriceAdjustmentEnvelope.builder()
                 .id(order.getCode())
