@@ -25,6 +25,7 @@ import com.example.becommerce.service.ConversationService;
 import com.example.becommerce.service.NotificationService;
 import com.example.becommerce.service.WsEventPublisher;
 import com.example.becommerce.utils.ConversationCodeGenerator;
+import com.example.becommerce.utils.JsonUtils;
 import com.example.becommerce.utils.MessageCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final MessageMapper               messageMapper;
     private final ConversationCodeGenerator   conversationCodeGenerator;
     private final MessageCodeGenerator        messageCodeGenerator;
+    private final JsonUtils                   jsonUtils;
     private final WsEventPublisher            eventPublisher;
     private final NotificationService         notificationService;
 
@@ -116,8 +118,15 @@ public class ConversationServiceImpl implements ConversationService {
                     "Tài khoản đối tác không phải là thợ");
         }
 
+        Order requestedOrder = null;
+        String orderCode = request.getOrderId();
+        if (orderCode != null && !orderCode.isBlank()) {
+            requestedOrder = orderRepository.findByCodeAndDeletedFalse(orderCode)
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn " + orderCode));
+        }
+
         Optional<Conversation> existing = conversationRepository
-                .findByCustomer_IdAndTechnician_Id(customer.getId(), technician.getId());
+                .findFirstByCustomer_IdAndTechnician_IdOrderByUpdatedAtDesc(customer.getId(), technician.getId());
         boolean isNewConversation = existing.isEmpty();
 
         Conversation conversation = existing.orElseGet(() -> Conversation.builder()
@@ -126,13 +135,14 @@ public class ConversationServiceImpl implements ConversationService {
                 .technician(technician)
                 .build());
 
-        if (request.getOrderId() != null && !request.getOrderId().isBlank()) {
-            Order order = orderRepository.findByCodeAndDeletedFalse(request.getOrderId())
-                    .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn " + request.getOrderId()));
-            conversation.setOrder(order);
+        if (requestedOrder != null) {
+            conversation.setOrder(requestedOrder);
         }
 
         Conversation saved = conversationRepository.save(conversation);
+        if (requestedOrder != null) {
+            appendRepairRequestMessage(saved, customer, requestedOrder);
+        }
         log.info("Conversation {} between customer={} technician={} (order={})",
                 saved.getCode(), customer.getCode(), technician.getCode(),
                 saved.getOrder() == null ? "-" : saved.getOrder().getCode());
@@ -260,6 +270,43 @@ public class ConversationServiceImpl implements ConversationService {
         } catch (Exception ex) {
             log.warn("Failed to push chat notification to {}: {}", recipient.getCode(), ex.getMessage());
         }
+    }
+
+    private void appendRepairRequestMessage(Conversation conversation, User customer, Order order) {
+        String orderMarker = "\"orderCode\":\"" + order.getCode() + "\"";
+        boolean alreadyExists = messageRepository.existsByConversation_IdAndTypeAndContentContaining(
+                conversation.getId(), MessageType.SYSTEM, orderMarker);
+        if (alreadyExists) {
+            return;
+        }
+
+        Message message = Message.builder()
+                .code(messageCodeGenerator.generate())
+                .conversation(conversation)
+                .sender(customer)
+                .type(MessageType.SYSTEM)
+                .content(jsonUtils.toJson(Map.of(
+                        "kind", "repair_request",
+                        "orderCode", order.getCode(),
+                        "deviceName", order.getDeviceName() == null ? "" : order.getDeviceName(),
+                        "serviceName", order.getServiceName() == null ? "" : order.getServiceName(),
+                        "serviceCategory", order.getServiceCategory() == null ? "" : order.getServiceCategory(),
+                        "description", order.getDescription() == null ? "" : order.getDescription(),
+                        "address", order.getAddress() == null ? "" : order.getAddress(),
+                        "estimatedPrice", order.getEstimatedPrice() == null ? 0 : order.getEstimatedPrice(),
+                        "expectedTime", order.getExpectedTime() == null ? "" : order.getExpectedTime().toString(),
+                        "images", order.getImages() == null
+                                ? List.of()
+                                : order.getImages().stream().map(image -> image.getUrl()).toList())))
+                .build();
+        Message savedMessage = messageRepository.save(message);
+
+        conversation.setLastMessageAt(savedMessage.getSentAt());
+        conversationRepository.save(conversation);
+
+        eventPublisher.publishMessageNew(
+                conversation.getCode(),
+                messageMapper.toResponse(savedMessage, customer, readWatermark(conversation, customer)));
     }
 
     private long countUnreadForParticipant(Long conversationId, Long userId, LocalDateTime watermark) {
