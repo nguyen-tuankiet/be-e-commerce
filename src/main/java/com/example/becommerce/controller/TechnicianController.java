@@ -4,11 +4,8 @@ import com.example.becommerce.dto.request.technician.UpdateAvailabilityRequest;
 import com.example.becommerce.dto.request.technician.UpdateTechnicianProfileRequest;
 import com.example.becommerce.dto.response.ApiResponse;
 import com.example.becommerce.dto.response.PagedResponse;
-import com.example.becommerce.dto.response.technician.AvailabilityResponse;
-import com.example.becommerce.dto.response.technician.TechnicianDetailResponse;
-import com.example.becommerce.dto.response.technician.TechnicianListItemResponse;
-import com.example.becommerce.dto.response.technician.TechnicianProfileUpdateResponse;
-import com.example.becommerce.dto.response.technician.TechnicianReviewListResponse;
+import com.example.becommerce.dto.response.technician.*;
+import com.example.becommerce.service.OrderService;
 import com.example.becommerce.service.TechnicianService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/technicians")
 @RequiredArgsConstructor
@@ -29,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TechnicianController {
 
     private final TechnicianService technicianService;
+    private final OrderService orderService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PagedResponse<TechnicianListItemResponse>>> list(
@@ -68,5 +68,22 @@ public class TechnicianController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(ApiResponse.success(technicianService.listReviews(code, page, limit)));
+    }
+
+    @GetMapping("/{id}/busy-slots")
+    public ResponseEntity<ApiResponse<List<BusySlotResponse>>> getTechnicianBusySlots(@PathVariable String id) {
+        return ResponseEntity.ok(
+                ApiResponse.success(orderService.getTechnicianBusySlots(id))
+        );
+    }
+
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<ApiResponse<DashboardStatsResponse>> getStats() {
+        return ResponseEntity.ok(ApiResponse.success(orderService.getDashboardStats()));
+    }
+
+    @GetMapping("/dashboard/chart")
+    public ResponseEntity<ApiResponse<List<ChartDataResponse>>> getChart(@RequestParam(defaultValue = "week") String period) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.getEarningsChart(period)));
     }
 }

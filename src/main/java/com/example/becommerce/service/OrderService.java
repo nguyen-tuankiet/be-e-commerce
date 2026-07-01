@@ -13,6 +13,11 @@ import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
+import com.example.becommerce.dto.response.technician.BusySlotResponse;
+import com.example.becommerce.dto.response.technician.ChartDataResponse;
+import com.example.becommerce.dto.response.technician.DashboardStatsResponse;
+
+import java.util.List;
 
 /**
  * Business operations on Orders. Visibility & authorization checks
@@ -69,4 +74,10 @@ public interface OrderService {
      * IPN callback): move it to COMPLETED and run the commission split. Idempotent.
      */
     void completeOrderAfterPayment(Long orderId);
+
+    /**
+     * Technicant dashboard*/
+    List<BusySlotResponse> getTechnicianBusySlots(String technicianCode);
+    DashboardStatsResponse getDashboardStats();
+    List<ChartDataResponse> getEarningsChart(String period);
 }

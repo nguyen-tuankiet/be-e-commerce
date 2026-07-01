@@ -15,6 +15,9 @@ import com.example.becommerce.dto.response.order.OrderPaymentResponse;
 import com.example.becommerce.dto.response.order.OrderResponse;
 import com.example.becommerce.dto.response.order.OrderStatusChangeResponse;
 import com.example.becommerce.dto.response.order.PriceAdjustmentEnvelope;
+import com.example.becommerce.dto.response.technician.BusySlotResponse;
+import com.example.becommerce.dto.response.technician.ChartDataResponse;
+import com.example.becommerce.dto.response.technician.DashboardStatsResponse;
 import com.example.becommerce.dto.response.warranty.WarrantyResponse;
 import com.example.becommerce.entity.Order;
 import com.example.becommerce.entity.OrderImage;
@@ -55,9 +58,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Order business logic.
@@ -1027,5 +1034,113 @@ public class OrderServiceImpl implements OrderService {
                             .build();
                     response.setWarrantyTicket(ticket);
                 });
+    }
+
+    @Override
+    @Transactional
+    public List<BusySlotResponse> getTechnicianBusySlots(String technicianCode) {
+        User current = getCurrentUser();
+
+        User technician = userRepository.findByCodeAndDeletedFalse(technicianCode)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thợ với mã: " + technicianCode));
+
+        LocalDateTime startOfToday = LocalDateTime.now().toLocalDate().atStartOfDay();
+
+        List<Order> busyOrders = orderRepository.findBusySlotsByTechnician(technician.getId(), startOfToday);
+
+        return busyOrders.stream().map(order -> {
+            if (current.getRole() == Role.ADMIN ||
+                    (current.getRole() == Role.TECHNICIAN && current.getId().equals(technician.getId()))) {
+
+                return BusySlotResponse.builder()
+                        .orderCode(order.getCode())
+                        .scheduledAt(order.getScheduledAt())
+                        .expectedTime(order.getExpectedTime())
+                        .deviceName(order.getDeviceName() != null ? order.getDeviceName() : order.getServiceName())
+                        .address(order.getAddress())
+                        .status(order.getStatus().name())
+                        .build();
+            } else {
+                return BusySlotResponse.builder()
+                        .orderCode("GU-******")
+                        .scheduledAt(order.getScheduledAt())
+                        .expectedTime(order.getExpectedTime())
+                        .deviceName("Khung giờ đã bận")
+                        .address("---")
+                        .status("BUSY")
+                        .build();
+            }
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardStatsResponse getDashboardStats() {
+        User current = getCurrentUser();
+        if (current.getRole() != Role.TECHNICIAN) {
+            throw AppException.forbidden("Chỉ thợ mới được xem thống kê");
+        }
+
+        LocalDateTime startOfWeek = LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay();
+        LocalDateTime endOfWeek = LocalDate.now().with(java.time.DayOfWeek.SUNDAY).atTime(LocalTime.MAX);
+
+        long total = orderRepository.countActiveOrdersByTechnician(current.getId());
+        long completed = orderRepository.countCompletedOrdersByTechnician(current.getId());
+
+        List<Order> weeklyOrders = orderRepository.findCompletedOrdersForChart(current.getId(), startOfWeek, endOfWeek);
+        long earnings = weeklyOrders.stream()
+                .mapToLong(o -> o.getFinalPrice() != null ? o.getFinalPrice() : 0L)
+                .sum();
+
+        return DashboardStatsResponse.builder()
+                .totalOrders(total)
+                .completedOrders(completed)
+                .weeklyEarnings(earnings)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChartDataResponse> getEarningsChart(String period) {
+        User current = getCurrentUser();
+        if (current.getRole() != Role.TECHNICIAN) {
+            throw AppException.forbidden("Chỉ thợ mới được xem biểu đồ");
+        }
+
+        LocalDateTime startDate;
+        LocalDateTime endDate = LocalDate.now().atTime(LocalTime.MAX);
+
+        // Gom nhóm dữ liệu (Sử dụng LinkedHashMap để giữ đúng thứ tự ngày)
+        Map<String, Long> groupedData = new LinkedHashMap<>();
+
+        if ("month".equalsIgnoreCase(period)) {
+            startDate = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            for (int i = 1; i <= LocalDate.now().getDayOfMonth(); i++) {
+                groupedData.put(String.format("%02d", i), 0L);
+            }
+
+            List<Order> orders = orderRepository.findCompletedOrdersForChart(current.getId(), startDate, endDate);
+            for (Order o : orders) {
+                String day = String.format("%02d", o.getCompletedAt().getDayOfMonth());
+                groupedData.put(day, groupedData.get(day) + (o.getFinalPrice() != null ? o.getFinalPrice() : 0L));
+            }
+        } else {
+            startDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay();
+            String[] days = {"T2", "T3", "T4", "T5", "T6", "T7", "CN"};
+            for (String d : days) {
+                groupedData.put(d, 0L);
+            }
+
+            List<Order> orders = orderRepository.findCompletedOrdersForChart(current.getId(), startDate, endDate);
+            for (Order o : orders) {
+                int dayOfWeek = o.getCompletedAt().getDayOfWeek().getValue();
+                String dayLabel = days[dayOfWeek - 1];
+                groupedData.put(dayLabel, groupedData.get(dayLabel) + (o.getFinalPrice() != null ? o.getFinalPrice() : 0L));
+            }
+        }
+
+        return groupedData.entrySet().stream()
+                .map(entry -> new ChartDataResponse(entry.getKey(), entry.getValue()))
+                .toList();
     }
 }

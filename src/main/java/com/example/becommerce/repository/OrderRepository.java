@@ -6,9 +6,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -45,4 +48,30 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     // Recent orders page within completedAt range, ordered by scheduledAt desc
     Page<Order> findByCompletedAtBetweenAndDeletedFalseOrderByScheduledAtDesc(LocalDateTime from, LocalDateTime to, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.technician.id = :technicianId " +
+            "AND o.status IN (com.example.becommerce.entity.enums.OrderStatus.SCHEDULED, " +
+            "                 com.example.becommerce.entity.enums.OrderStatus.IN_PROGRESS, " +
+            "                 com.example.becommerce.entity.enums.OrderStatus.AWAITING_PAYMENT) " +
+            "AND (o.scheduledAt >= :fromDate OR o.expectedTime >= :fromDate) " +
+            "AND o.deleted = false")
+    List<Order> findBusySlotsByTechnician(
+            @Param("technicianId") Long technicianId,
+            @Param("fromDate") LocalDateTime fromDate);
+
+    // Đếm tổng số đơn thợ đã nhận (bỏ qua đơn bị hủy)
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.technician.id = :techId AND o.status <> 'CANCELLED'")
+    long countActiveOrdersByTechnician(@Param("techId") Long techId);
+
+    // Đếm số đơn đã hoàn thành của thợ
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.technician.id = :techId AND o.status = 'COMPLETED'")
+    long countCompletedOrdersByTechnician(@Param("techId") Long techId);
+
+    // Lấy danh sách các đơn đã hoàn thành trong một khoảng thời gian để tính doanh thu
+    @Query("SELECT o FROM Order o WHERE o.technician.id = :techId AND o.status = 'COMPLETED' " +
+            "AND o.completedAt >= :startDate AND o.completedAt <= :endDate")
+    List<Order> findCompletedOrdersForChart(
+            @Param("techId") Long techId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 }

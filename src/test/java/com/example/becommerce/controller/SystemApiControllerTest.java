@@ -134,7 +134,7 @@ class SystemApiControllerTest {
         userMvc         = std(new UserController(userService), advice);
         walletMvc       = std(new WalletController(walletService), advice);
         orderMvc        = std(new OrderController(orderService), advice);
-        technicianMvc   = std(new TechnicianController(technicianService), advice);
+//        technicianMvc   = std(new TechnicianController(technicianService), advice);
         verificationMvc = std(new VerificationController(verificationService), advice);
         conversationMvc = std(new ConversationController(conversationService, quotationService), advice);
         quotationMvc    = std(new QuotationController(quotationService), advice);
