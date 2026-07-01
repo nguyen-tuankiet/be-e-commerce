@@ -17,6 +17,7 @@ import com.example.becommerce.entity.TechnicianProfile;
 import com.example.becommerce.entity.User;
 import com.example.becommerce.entity.enums.OrderStatus;
 import com.example.becommerce.entity.enums.Role;
+import com.example.becommerce.entity.enums.VerificationStatus;
 import com.example.becommerce.exception.AppException;
 import com.example.becommerce.repository.OrderRepository;
 import com.example.becommerce.repository.ReviewRepository;
@@ -100,7 +101,7 @@ public class TechnicianServiceImpl implements TechnicianService {
     // ===============================================================
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public TechnicianDetailResponse getTechnician(String code) {
         User technician = findTechnicianUser(code);
         TechnicianProfile profile = findOrCreateProfile(technician);
@@ -253,7 +254,10 @@ public class TechnicianServiceImpl implements TechnicianService {
     private TechnicianProfile findOrCreateProfile(User technician) {
         return profileRepository.findByUser_Id(technician.getId())
                 .orElseGet(() -> profileRepository.save(
-                        TechnicianProfile.builder().user(technician).build()));
+                        TechnicianProfile.builder()
+                                .user(technician)
+                                .verificationStatus(VerificationStatus.NONE)
+                                .build()));
     }
 
     private void ensureSelfOrAdmin(User target) {
