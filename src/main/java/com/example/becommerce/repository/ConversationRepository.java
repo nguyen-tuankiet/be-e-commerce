@@ -19,8 +19,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     long count();
 
-    /** Conversation between this exact (customer, technician) pair, regardless of order link. */
-    Optional<Conversation> findByCustomer_IdAndTechnician_Id(Long customerId, Long technicianId);
+    /** Latest conversation between this exact (customer, technician) pair, regardless of order link. */
+    Optional<Conversation> findFirstByCustomer_IdAndTechnician_IdOrderByUpdatedAtDesc(Long customerId, Long technicianId);
 
     /** All conversations where the given user is either the customer or the technician. */
     @Query(value = """
@@ -29,6 +29,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             LEFT JOIN FETCH c.technician
             LEFT JOIN FETCH c.order
             WHERE c.customer.id = :userId OR c.technician.id = :userId
+            ORDER BY COALESCE(c.lastMessageAt, c.updatedAt, c.createdAt) DESC
             """,
             countQuery = """
             SELECT COUNT(c) FROM Conversation c

@@ -80,8 +80,7 @@ public class QuotationServiceImpl implements QuotationService {
             throw AppException.forbidden("Bạn không phải thợ của cuộc trò chuyện này");
         }
 
-        Order order = orderRepository.findByCodeAndDeletedFalse(request.getOrderCode())
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng " + request.getOrderCode()));
+        Order order = resolveQuotationOrder(conversation, request);
 
         Quotation quotation = Quotation.builder()
                 .code(quotationCodeGenerator.generate())
@@ -234,6 +233,33 @@ public class QuotationServiceImpl implements QuotationService {
     private Conversation findConversation(String code) {
         return conversationRepository.findByCode(code)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy cuộc trò chuyện " + code));
+    }
+
+    private Order resolveQuotationOrder(Conversation conversation, CreateQuotationRequest request) {
+        String orderCode = request.getOrderCode();
+        if (orderCode != null && !orderCode.isBlank()) {
+            Order order = orderRepository.findByCodeAndDeletedFalse(orderCode)
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn hàng " + orderCode));
+            boolean sameCustomer = order.getCustomer() != null
+                    && conversation.getCustomer() != null
+                    && order.getCustomer().getId().equals(conversation.getCustomer().getId());
+            boolean sameTechnician = order.getTechnician() != null
+                    && conversation.getTechnician() != null
+                    && order.getTechnician().getId().equals(conversation.getTechnician().getId());
+            if (!sameCustomer || !sameTechnician) {
+                throw AppException.badRequest(ErrorCode.VALIDATION_ERROR,
+                        "Báo giá phải gắn với yêu cầu sửa chữa của cuộc trò chuyện");
+            }
+            conversation.setOrder(order);
+            conversationRepository.save(conversation);
+            return order;
+        }
+
+        if (conversation.getOrder() == null) {
+            throw AppException.badRequest(ErrorCode.BAD_REQUEST,
+                    "Cuộc trò chuyện chưa gắn với yêu cầu sửa chữa");
+        }
+        return conversation.getOrder();
     }
 
     private User getCurrentUser() {
